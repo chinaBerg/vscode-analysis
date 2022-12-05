@@ -41,25 +41,28 @@ function hygiene(some, linting = true) {
 		const lines = file.contents.toString('utf8').split(/\r\n|\r|\n/);
 		file.__lines = lines;
 
-		let skipNext = false;
-		lines.forEach((line, i) => {
-			if (/allow-any-unicode-next-line/.test(line)) {
-				skipNext = true;
-				return;
-			}
-			if (skipNext) {
-				skipNext = false;
-				return;
-			}
-			// Please do not add symbols that resemble ASCII letters!
-			const m = /([^\t\n\r\x20-\x7E⊃⊇✔︎✓🎯⚠️🛑🔴🚗🚙🚕🎉✨❗⇧⌥⌘×÷¦⋯…↑↓￫→←↔⟷·•●◆▼⟪⟫┌└├⏎↩√φ]+)/g.exec(line);
-			if (m) {
-				console.error(
-					file.relative + `(${i + 1},${m.index + 1}): Unexpected unicode character: "${m[0]}" (charCode: ${m[0].charCodeAt(0)}). To suppress, use // allow-any-unicode-next-line`
-				);
-				errorCount++;
-			}
-		});
+		// TODO：关闭对部分输入字符的限制
+		// 本项目目的是增加代码解读内容
+
+		// let skipNext = false;
+		// lines.forEach((line, i) => {
+		// 	if (/allow-any-unicode-next-line/.test(line)) {
+		// 		skipNext = true;
+		// 		return;
+		// 	}
+		// 	if (skipNext) {
+		// 		skipNext = false;
+		// 		return;
+		// 	}
+		// 	// Please do not add symbols that resemble ASCII letters!
+		// 	const m = /([^\t\n\r\x20-\x7E⊃⊇✔︎✓🎯⚠️🛑🔴🚗🚙🚕🎉✨❗⇧⌥⌘×÷¦⋯…↑↓￫→←↔⟷·•●◆▼⟪⟫┌└├⏎↩√φ]+)/g.exec(line);
+		// 	if (m) {
+		// 		console.error(
+		// 			file.relative + `(${i + 1},${m.index + 1}): Unexpected unicode character: "${m[0]}" (charCode: ${m[0].charCodeAt(0)}). To suppress, use // allow-any-unicode-next-line`
+		// 		);
+		// 		errorCount++;
+		// 	}
+		// });
 
 		this.emit('data', file);
 	});
