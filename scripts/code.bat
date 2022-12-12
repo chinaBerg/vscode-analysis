@@ -23,7 +23,7 @@ if "%VSCODE_SKIP_PRELAUNCH%"=="" node build/lib/preLaunch.js
 :: findstr从product.json文件中提取含有 "nameShort":.* 格式的行
 ::    /R表示把后面的参数作为表达式使用，/C:"xxx"表示指定的字符串包含的空格不能作为分隔符
 :: for循环迭代筛选的行，`delims=:,`按分号或逗号分割字符串，`token=2`提取分割结果的第二项
-::    将提取结果赋值给变量a，设置环境变量NAMESHORT的结果为变量a，%%~a中的~表示去掉所有的引号
+::    将提取结果赋值给变量a，设置环境变量NAMESHORT的结果为环境变量a，%%~a中的~表示去掉所有的引号
 for /f "tokens=2 delims=:," %%a in ('findstr /R /C:"\"nameShort\":.*" product.json') do set NAMESHORT=%%~a
 
 :: 去除NAMESHORT变量的所有 空格引号 两个字符
