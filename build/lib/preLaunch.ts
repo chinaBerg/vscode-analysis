@@ -55,6 +55,7 @@ async function main() {
 	await getBuiltInExtensions();
 }
 
+// 直接调用脚本时运行
 if (require.main === module) {
 	main().catch(err => {
 		console.error(err);
