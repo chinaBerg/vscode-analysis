@@ -253,6 +253,7 @@ const ghDownloadHeaders = {
 	Accept: 'application/octet-stream',
 };
 
+// 从Github上下载资源
 export function fromGithub({ name, version, repo, metadata }: IBuiltInExtension): Stream {
 	const remote = require('gulp-remote-retry-src');
 	const json = require('gulp-json-editor') as typeof import('gulp-json-editor');

@@ -35,9 +35,13 @@ export interface IExtensionDefinition {
 }
 
 const root = path.dirname(path.dirname(__dirname));
+// 读取根目录下 project.json 文件内容
 const productjson = JSON.parse(fs.readFileSync(path.join(__dirname, '../../product.json'), 'utf8'));
+// project.json中builtInExtensions字段，一组调试相关内容扩展插件信息
 const builtInExtensions = <IExtensionDefinition[]>productjson.builtInExtensions || [];
+// project.json中builtInExtensions字段，暂时为空
 const webBuiltInExtensions = <IExtensionDefinition[]>productjson.webBuiltInExtensions || [];
+//
 const controlFilePath = path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');
 const ENABLE_LOGGING = !process.env['VSCODE_BUILD_BUILTIN_EXTENSIONS_SILENCE_PLEASE'];
 
@@ -68,6 +72,7 @@ function isUpToDate(extension: IExtensionDefinition): boolean {
 	}
 }
 
+// 调用封装的方法下载插件
 function getExtensionDownloadStream(extension: IExtensionDefinition) {
 	const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
 	return (galleryServiceUrl ? ext.fromMarketplace(galleryServiceUrl, extension) : ext.fromGithub(extension))
@@ -85,6 +90,7 @@ export function getExtensionStream(extension: IExtensionDefinition) {
 	return getExtensionDownloadStream(extension);
 }
 
+// 同步扩展插件
 function syncMarketplaceExtension(extension: IExtensionDefinition): Stream {
 	const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
 	const source = ansiColors.blue(galleryServiceUrl ? '[marketplace]' : '[github]');
@@ -95,11 +101,14 @@ function syncMarketplaceExtension(extension: IExtensionDefinition): Stream {
 
 	rimraf.sync(getExtensionPath(extension));
 
+	// 将扩展插件下载到根目录下.build/builtInExtensions下
+	// 目前下载了ms-vscode.js-debug、ms-vscode.js-compoanion、ms-vscode.vscode-js-profile-table
 	return getExtensionDownloadStream(extension)
 		.pipe(vfs.dest('.build/builtInExtensions'))
 		.on('end', () => log(source, extension.name, ansiColors.green('✔︎')));
 }
 
+// 同步插件
 function syncExtension(extension: IExtensionDefinition, controlState: 'disabled' | 'marketplace'): Stream {
 	if (extension.platforms) {
 		const platforms = new Set(extension.platforms);
@@ -137,6 +146,7 @@ interface IControlFile {
 	[name: string]: 'disabled' | 'marketplace';
 }
 
+// 读取用户目录下.vscode-oss-dev/extensions/control.json文件内容
 function readControlFile(): IControlFile {
 	try {
 		return JSON.parse(fs.readFileSync(controlFilePath, 'utf8'));
@@ -154,6 +164,7 @@ export function getBuiltInExtensions(): Promise<void> {
 	log('Synchronizing built-in extensions...');
 	log(`You can manage built-in extensions with the ${ansiColors.cyan('--builtin')} flag`);
 
+	// 获取control.json内容
 	const control = readControlFile();
 	const streams: Stream[] = [];
 
@@ -161,12 +172,14 @@ export function getBuiltInExtensions(): Promise<void> {
 		const controlState = control[extension.name] || 'marketplace';
 		control[extension.name] = controlState;
 
+		// 依次下载插件
 		streams.push(syncExtension(extension, controlState));
 	}
 
 	writeControlFile(control);
 
 	return new Promise((resolve, reject) => {
+		// 合并为一个stream，error时reject，end时resolve
 		es.merge(streams)
 			.on('error', reject)
 			.on('end', resolve);
