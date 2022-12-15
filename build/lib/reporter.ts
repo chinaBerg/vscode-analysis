@@ -15,17 +15,23 @@ class ErrorLog {
 	}
 	allErrors: string[][] = [];
 	startTime: number | null = null;
+	// 控制开始和结束输出的依赖关系
+	// 改用状态机更健壮一些
 	count = 0;
 
+	// 开始输出日志
 	onStart(): void {
 		if (this.count++ > 0) {
 			return;
 		}
 
+		// 记录开始输出日志的时间
 		this.startTime = new Date().getTime();
+		// 输出日志
 		fancyLog(`Starting ${ansiColors.green('compilation')}${this.id ? ansiColors.blue(` ${this.id}`) : ''}...`);
 	}
 
+	// 结束输出
 	onEnd(): void {
 		if (--this.count > 0) {
 			return;
@@ -38,13 +44,16 @@ class ErrorLog {
 		const errors = _.flatten(this.allErrors);
 		const seen = new Set<string>();
 
+		// 输出错误日志
 		errors.map(err => {
+			// 避免输出重复日志
 			if (!seen.has(err)) {
 				seen.add(err);
 				fancyLog(`${ansiColors.red('Error')}: ${err}`);
 			}
 		});
 
+		// 输出结束日志
 		fancyLog(`Finished ${ansiColors.green('compilation')}${this.id ? ansiColors.blue(` ${this.id}`) : ''} with ${errors.length} errors after ${ansiColors.magenta((new Date().getTime() - this.startTime!) + ' ms')}`);
 
 		const regex = /^([^(]+)\((\d+),(\d+)\): (.*)$/s;
@@ -55,6 +64,7 @@ class ErrorLog {
 			.map(([, path, line, column, message]) => ({ path, line: parseInt(line), column: parseInt(column), message }));
 
 		try {
+			// 输出日志到.build/log_${this.id}文件
 			const logFileName = 'log' + (this.id ? `_${this.id}` : '');
 			fs.writeFileSync(path.join(buildLogFolder, logFileName), JSON.stringify(messages));
 		} catch (err) {
@@ -64,6 +74,7 @@ class ErrorLog {
 
 }
 
+// 获取ErrorLog实例，不存在则创建一个
 const errorLogsById = new Map<string, ErrorLog>();
 function getErrorLog(id: string = '') {
 	let errorLog = errorLogsById.get(id);
@@ -77,6 +88,7 @@ function getErrorLog(id: string = '') {
 const buildLogFolder = path.join(path.dirname(path.dirname(__dirname)), '.build');
 
 try {
+	// 确保.build目录存在，不存在则新建
 	fs.mkdirSync(buildLogFolder);
 } catch (err) {
 	// ignore
@@ -94,14 +106,20 @@ export function createReporter(id?: string): IReporter {
 	const errors: string[] = [];
 	errorLog.allErrors.push(errors);
 
+	// 添加错误
 	const result = (err: string) => errors.push(err);
 
+	// 判断是否存在错误
 	result.hasErrors = () => errors.length > 0;
 
+	// 输出日志
 	result.end = (emitError: boolean): NodeJS.ReadWriteStream => {
 		errors.length = 0;
+		// 调用result.end()方法开始输出日志
 		errorLog.onStart();
 
+		// 并且返回一个双工流
+		// 该双工流定义了结束方法
 		return es.through(undefined, function () {
 			errorLog.onEnd();
 

@@ -480,10 +480,15 @@ function createTscCompileTask(watch) {
 		const createReporter = require('./lib/reporter').createReporter;
 
 		return new Promise((resolve, reject) => {
+			// 指定--notEmit参数不输出文件，仅用于类型检查
+			// -p ./src/tsconfig.monaco.json指定编译的配置文件
 			const args = ['./node_modules/.bin/tsc', '-p', './src/tsconfig.monaco.json', '--noEmit'];
+			// 监听改变重新编译检查类型
 			if (watch) {
 				args.push('-w');
 			}
+			// 开子进程运行tsc编译指令
+			// TODO_BERG: 这里通过node执行bin目录下的脚本似乎是无效的
 			const child = cp.spawn(`node`, args, {
 				cwd: path.join(__dirname, '..'),
 				// stdio: [null, 'pipe', 'inherit']
@@ -498,12 +503,18 @@ function createTscCompileTask(watch) {
 
 			child.stdout.on('data', data => {
 				let str = String(data);
+				// 将数据中包含的ansi字符去掉
 				str = str.replace(magic, '').trim();
 				if (str.indexOf('Starting compilation') >= 0 || str.indexOf('File change detected') >= 0) {
 					errors.length = 0;
+					// 编译开始时，创建一个reporter流
+					// report是个双工流，es.through()创建
 					report = reporter.end(false);
 
 				} else if (str.indexOf('Compilation complete') >= 0) {
+					// 编译结束时，调用流的end()方法
+					// 最终根据是否有错误日志进行输出以及输出结束日志
+					// 输出完日志后触发流的emit('end')事件
 					report.end();
 
 				} else if (str) {
@@ -513,13 +524,18 @@ function createTscCompileTask(watch) {
 						// e.g. src/vs/base/common/strings.ts(663,5): error TS2322: Type '1234' is not assignable to type 'string'.
 						const fullpath = path.join(root, match[1]);
 						const message = match[3];
+						// 记录ts类型错误
 						reporter(fullpath + message);
 					} else {
+						// 记录错误
 						reporter(str);
 					}
 				}
 			});
-			child.on('exit', resolve);
+			child.on('exit', () => {
+				console.log('exit');
+				resolve();
+			});
 			child.on('error', reject);
 		});
 	};

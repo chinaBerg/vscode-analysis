@@ -35,6 +35,12 @@ const watchClientTask = task.define('watch-client', task.series(util.rimraf('out
 gulp.task(watchClientTask);
 
 // All
+/**
+ * 创建gulp任务compile,
+ * 运行gulp compile时会执行该任务（package.json script中compile命令实际运行的该任务）,
+ * 并行执行下面四个任务：
+ * 	- monacoTypecheckTask
+ */
 const _compileTask = task.define('compile', task.parallel(monacoTypecheckTask, compileClientTask, compileExtensionsTask, compileExtensionMediaTask));
 gulp.task(_compileTask);
 

@@ -100,6 +100,10 @@ export function parallel(...tasks: Task[]): PromiseTask {
 	return result;
 }
 
+/**
+ * 创建gulp的任务函数
+ * 将task函数包装成gulp.task()参数格式
+ */
 export function define(name: string, task: Task): Task {
 	if (task._tasks) {
 		// This is a composite task
