@@ -214,7 +214,11 @@ function getElectron(arch: string): () => NodeJS.ReadWriteStream {
 		});
 
 		return vfs.src('package.json') // 读取package.json文件内容
-			.pipe(json({ name: product.nameShort })) // 替换name字段为product.json中的nameShort字段
+			/**
+			 * 注意这里修改了构建出的electron.exe程序的名称为product.json的nameShort字段
+			 * 后续scripts/code.bat和code-cli.bat等脚本也是通过nameShort字段寻找对应的exe来启动electron程序
+			 */
+			.pipe(json({ name: product.nameShort }))
 			.pipe(electron(electronOpts)) // 构建electron程序
 			.pipe(filter(['**', '!**/app/package.json'])) // 排除构建的electron程序文件中的**/app/package.json文件
 			.pipe(vfs.dest('.build/electron')); // 磁盘输出到.build/electron目录下
