@@ -474,7 +474,7 @@ gulp.task('monacodts', task.define('monacodts', () => {
 }));
 
 //#region monaco type checking
-
+// 使用Tsc命令检查monaco相关文件的ts类型
 function createTscCompileTask(watch) {
 	return () => {
 		const createReporter = require('./lib/reporter').createReporter;
