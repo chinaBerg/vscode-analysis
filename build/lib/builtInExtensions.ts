@@ -160,6 +160,7 @@ function writeControlFile(control: IControlFile): void {
 	fs.writeFileSync(controlFilePath, JSON.stringify(control, null, 2));
 }
 
+// 构建内置扩展插件
 export function getBuiltInExtensions(): Promise<void> {
 	log('Synchronizing built-in extensions...');
 	log(`You can manage built-in extensions with the ${ansiColors.cyan('--builtin')} flag`);

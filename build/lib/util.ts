@@ -357,6 +357,7 @@ export function streamToPromise(stream: NodeJS.ReadWriteStream): Promise<void> {
 	});
 }
 
+// 从根目录.yarnrc文件中读取electron目标版本
 export function getElectronVersion(): string {
 	const yarnrc = fs.readFileSync(path.join(root, '.yarnrc'), 'utf8');
 	const target = /^target "(.*)"$/m.exec(yarnrc)![1];

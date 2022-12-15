@@ -90,7 +90,9 @@ function darwinBundleDocumentTypes(types: { [name: string]: string | string[] },
 	});
 }
 
+// 构建electron程序的默认配置
 export const config = {
+	// version是构建的必须参数
 	version: util.getElectronVersion(),
 	productAppName: product.nameLong,
 	companyName: 'Microsoft Corporation',
@@ -191,38 +193,51 @@ export const config = {
 	repo: product.electronRepository || undefined
 };
 
+/**
+ * 利用gulp-atom-electron根据系统环境构建electron程序
+ * @param arch CPU架构
+ * @returns
+ */
 function getElectron(arch: string): () => NodeJS.ReadWriteStream {
 	return () => {
+		// 利用gulp-atom-electron根据环境构建electron程序
+		// package.json中并没有添加electron依赖，而是在预启动时动态构建
 		const electron = require('gulp-atom-electron');
 		const json = require('gulp-json-editor') as typeof import('gulp-json-editor');
 
 		const electronOpts = _.extend({}, config, {
+			// platform也是必须字段
 			platform: process.platform,
 			arch: arch === 'armhf' ? 'arm' : arch,
 			ffmpegChromium: true,
 			keepDefaultApp: true
 		});
 
-		return vfs.src('package.json')
-			.pipe(json({ name: product.nameShort }))
-			.pipe(electron(electronOpts))
-			.pipe(filter(['**', '!**/app/package.json']))
-			.pipe(vfs.dest('.build/electron'));
+		return vfs.src('package.json') // 读取package.json文件内容
+			.pipe(json({ name: product.nameShort })) // 替换name字段为product.json中的nameShort字段
+			.pipe(electron(electronOpts)) // 构建electron程序
+			.pipe(filter(['**', '!**/app/package.json'])) // 排除构建的electron程序文件中的**/app/package.json文件
+			.pipe(vfs.dest('.build/electron')); // 磁盘输出到.build/electron目录下
 	};
 }
 
 async function main(arch = process.arch): Promise<void> {
+	// 读取根目录下.yarnrc文件中配置的electron目标版本
 	const version = util.getElectronVersion();
 	const electronPath = path.join(root, '.build', 'electron');
+	// 从.build/electron/version文件中读取已构建的electron版本
 	const versionFile = path.join(electronPath, 'version');
 	const isUpToDate = fs.existsSync(versionFile) && fs.readFileSync(versionFile, 'utf8') === `${version}`;
 
+	// 已安装版本和目标版本不一致在，则删除已安装版本重新下载对应版本
 	if (!isUpToDate) {
 		await util.rimraf(electronPath)();
+		// 调用getElectron下载electron目标版本
 		await util.streamToPromise(getElectron(arch)());
 	}
 }
 
+// 直接脚本调用时才执行
 if (require.main === module) {
 	main(process.argv[2]).catch(err => {
 		console.error(err);
