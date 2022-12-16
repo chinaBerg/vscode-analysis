@@ -266,10 +266,12 @@ export function rewriteSourceMappingURL(sourceMappingURLBase: string): NodeJS.Re
 	return es.duplex(input, output);
 }
 
+// 删除指定文件夹
 export function rimraf(dir: string): () => Promise<void> {
 	const result = () => new Promise<void>((c, e) => {
 		let retries = 0;
 
+		// 删除失败尝试5次，间隔10ms
 		const retry = () => {
 			_rimraf(dir, { maxBusyTries: 1 }, (err: any) => {
 				if (!err) {
@@ -364,6 +366,15 @@ export function getElectronVersion(): string {
 	return target;
 }
 
+/**
+ * 读取/remote/web的package.json读取所有依赖库并获取依赖库在node_modules中真实的源文件入口
+ * @returns {
+ * 	"@microsoft/1ds-core-js": "dist/ms.core.min.js",
+ * 	"@microsoft/1ds-post-js": "dist/ms.post.min.js",
+ * 	"@vscode/iconv-lite-umd": "lib/iconv-lite-umd.js",
+ * 	 ......
+ * }
+ */
 export function acquireWebNodePaths() {
 	const root = path.join(__dirname, '..', '..');
 	const webPackageJSON = path.join(root, '/remote/web', 'package.json');
@@ -431,6 +442,10 @@ export function createExternalLoaderConfig(webEndpoint?: string, commit?: string
 	return externalLoaderConfig;
 }
 
+/**
+ * 生成/out/vs/webPackagePaths.js，
+ * 并将/remote/web项目所有依赖库在node_modules中的源文件入口地址写入到webPackagePaths.js中
+ */
 export function buildWebNodePaths(outDir: string) {
 	const result = () => new Promise<void>((resolve, _) => {
 		const root = path.join(__dirname, '..', '..');
