@@ -253,9 +253,14 @@ class MonacoGenerator {
 	}
 }
 
+/**
+ * 流的方式读取的所有名称组成映射数据（传入的是gulp.src('src/vscode-dts/**')流文件），
+ * 将映射数据写入 vs/workbench/services/extensions/common/extensionsApiProposals.ts 文件
+ */
 function generateApiProposalNames() {
 	let eol: string;
 
+	// 获取extensionsApiProposals.ts文件实际的换行符
 	try {
 		const src = fs.readFileSync('src/vs/workbench/services/extensions/common/extensionsApiProposals.ts', 'utf-8');
 		const match = /\r?\n/m.exec(src);
@@ -274,11 +279,13 @@ function generateApiProposalNames() {
 			const name = path.basename(f.path);
 			const match = pattern.exec(name);
 
+			// 获取文件名称中vscode.proposed.后和.d.ts前的部分
 			if (match) {
 				proposalNames.add(match[1]);
 			}
 		}, function () {
 			const names = [...proposalNames.values()].sort();
+			// 生成文件内容
 			const contents = [
 				'/*---------------------------------------------------------------------------------------------',
 				' *  Copyright (c) Microsoft Corporation. All rights reserved.',
@@ -294,6 +301,7 @@ function generateApiProposalNames() {
 				'',
 			].join(eol);
 
+			// 生产 Vinyl 格式的文件数据传递下去
 			this.emit('data', new File({
 				path: 'vs/workbench/services/extensions/common/extensionsApiProposals.ts',
 				contents: Buffer.from(contents)
@@ -301,11 +309,13 @@ function generateApiProposalNames() {
 			this.emit('end');
 		}));
 
+	// 返回一个duplex双工流
 	return es.duplex(input, output);
 }
 
 const apiProposalNamesReporter = createReporter('api-proposal-names');
 
+// 根据src/vscode-dts/下所有文件名称生成 extensionsApiProposals.ts 文件
 export const compileApiProposalNamesTask = task.define('compile-api-proposal-names', () => {
 	return gulp.src('src/vscode-dts/**')
 		.pipe(generateApiProposalNames())
