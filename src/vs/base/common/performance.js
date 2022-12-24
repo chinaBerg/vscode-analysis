@@ -20,6 +20,7 @@
 		}
 
 		function mark(name) {
+			// 使用时间戳作为hack
 			_data.push(name, Date.now());
 		}
 		function getMarks() {
@@ -52,19 +53,25 @@
 
 			} else {
 				// use "native" performance for mark and getMarks
+				// 原生支持performace的mark和getMarks则使用原生的语法
 				return {
 					mark(name) {
+						// 调用原生mark方法记录某一个时刻高精度时间
 						performance.mark(name);
 					},
 					getMarks() {
 						let timeOrigin = performance.timeOrigin;
+						// safari兼容
 						if (typeof timeOrigin !== 'number') {
 							// safari: there is no timerOrigin but in renderers there is the timing-property
 							// see https://bugs.webkit.org/show_bug.cgi?id=174862
 							timeOrigin = performance.timing.navigationStart || performance.timing.redirectStart || performance.timing.fetchStart;
 						}
+
+						// 第一项是记录性能测量开始时的时间的高精度时间戳
 						const result = [{ name: 'code/timeOrigin', startTime: Math.round(timeOrigin) }];
 						for (const entry of performance.getEntriesByType('mark')) {
+							// 获取所有mark方法调用而记录的时间戳
 							result.push({
 								name: entry.name,
 								startTime: Math.round(timeOrigin + entry.startTime)
@@ -94,6 +101,8 @@
 		}
 		return sharedObj.MonacoPerformanceMarks;
 	}
+
+	// 支持amd和commonjs模块化规范
 
 	// This module can be loaded in an amd and commonjs-context.
 	// Because we want both instances to use the same perf-data

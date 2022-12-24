@@ -13,6 +13,7 @@
  */
 
 const perf = require('./vs/base/common/performance');
+// 记录主进程开始启动的高精度时间戳
 perf.mark('code/didStartMain');
 
 const path = require('path');
@@ -46,8 +47,10 @@ const argvConfig = configureCommandlineSwitchesSync(args);
 // Disable default menu (https://github.com/electron/electron/issues/35512)
 Menu.setApplicationMenu(null);
 
-// Configure crash reporter
+// 记录configureCrashReporter开始的高精度时间戳
 perf.mark('code/willStartCrashReporter');
+
+// Configure crash reporter
 // If a crash-reporter-directory is specified we store the crash reports
 // in the specified directory and don't upload them to the crash server.
 //
@@ -139,13 +142,14 @@ function startup(codeCachePath, nlsConfig) {
 	process.env['VSCODE_CODE_CACHE_PATH'] = codeCachePath || '';
 
 	// Load main in AMD
-	perf.mark('code/willLoadMainBundle');
+	perf.mark('code/willLoadMainBundle'); // 记录用amd开始加载main的时间戳
 	require('./bootstrap-amd').load('vs/code/electron-main/main', () => {
-		perf.mark('code/didLoadMainBundle');
+		perf.mark('code/didLoadMainBundle'); // 记录amd加载main完成的时间戳
 	});
 }
 
 async function onReady() {
+	// 记录app ready时的时间戳
 	perf.mark('code/mainAppReady');
 
 	try {
