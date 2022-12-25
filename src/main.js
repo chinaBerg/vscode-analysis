@@ -34,8 +34,11 @@ const portable = bootstrapNode.configurePortable(product);
 bootstrap.enableASARSupport();
 
 // Set userData path before app 'ready' event
+// args获取到的命令行参数
 const args = parseCLIArgs();
+// 获取用户数据目录
 const userDataPath = getUserDataPath(args, product.nameShort ?? 'code-oss-dev');
+// 设置用户数据目录
 app.setPath('userData', userDataPath);
 
 // Resolve code cache path
@@ -59,6 +62,8 @@ perf.mark('code/willStartCrashReporter');
 // * --disable-crash-reporter command line parameter is not set
 //
 // Disable crash reporting in all other cases.
+// 配置崩溃报告
+// 如果指定了crash-reporter-directory参数则不会上传到creash服务器
 if (args['crash-reporter-directory'] || (argvConfig['enable-crash-reporter'] && !args['disable-crash-reporter'])) {
 	configureCrashReporter();
 }
@@ -328,23 +333,29 @@ function getArgvConfigPath() {
 	return path.join(os.homedir(), dataFolderName, 'argv.json');
 }
 
+// 配置崩溃报告
 function configureCrashReporter() {
 
+	// 获取命令行参数中指定的崩溃报告目录
 	let crashReporterDirectory = args['crash-reporter-directory'];
 	let submitURL = '';
 	if (crashReporterDirectory) {
 		crashReporterDirectory = path.normalize(crashReporterDirectory);
 
+		// 确保是绝对路径
 		if (!path.isAbsolute(crashReporterDirectory)) {
 			console.error(`The path '${crashReporterDirectory}' specified for --crash-reporter-directory must be absolute.`);
+			// 不是绝对路径则退出程序
 			app.exit(1);
 		}
 
+		// 目录不存在则新建目录
 		if (!fs.existsSync(crashReporterDirectory)) {
 			try {
 				fs.mkdirSync(crashReporterDirectory, { recursive: true });
 			} catch (error) {
 				console.error(`The path '${crashReporterDirectory}' specified for --crash-reporter-directory does not seem to exist or cannot be created.`);
+				// 异常退出
 				app.exit(1);
 			}
 		}
@@ -352,12 +363,15 @@ function configureCrashReporter() {
 		// Crashes are stored in the crashDumps directory by default, so we
 		// need to change that directory to the provided one
 		console.log(`Found --crash-reporter-directory argument. Setting crashDumps directory to be '${crashReporterDirectory}'`);
+		// 调用electron api设置crashDumps目录
 		app.setPath('crashDumps', crashReporterDirectory);
 	}
 
 	// Otherwise we configure the crash reporter from product.json
+	// 未指定值得情况下尝试从product.json配置中获取相关内容
 	else {
 		const appCenter = product.appCenter;
+		// BERG_TODO: 目前已不存在相关配置字段，下面内容似乎是无用的
 		if (appCenter) {
 			const isWindows = (process.platform === 'win32');
 			const isLinux = (process.platform === 'linux');
@@ -414,6 +428,7 @@ function configureCrashReporter() {
 	const productName = (product.crashReporter ? product.crashReporter.productName : undefined) || product.nameShort;
 	const companyName = (product.crashReporter ? product.crashReporter.companyName : undefined) || 'Microsoft';
 	const uploadToServer = Boolean(!process.env['VSCODE_DEV'] && submitURL && !crashReporterDirectory);
+	// 提交崩溃报告
 	crashReporter.start({
 		companyName,
 		productName: process.env['VSCODE_DEV'] ? `${productName} Dev` : productName,
@@ -444,6 +459,7 @@ function getJSFlags(cliArgs) {
 }
 
 /**
+ * 利用minimist解析命令行指定的参数
  * @returns {NativeParsedArgs}
  */
 function parseCLIArgs() {

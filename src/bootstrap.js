@@ -19,6 +19,8 @@
 		globalThis.MonacoBootstrap = factory();
 	}
 }(this, function () {
+	// module 变量是对代表当前模块的对象的引用
+	// require('module')获取当前模块对象
 	const Module = typeof require === 'function' ? require('module') : undefined;
 	const path = typeof require === 'function' ? require('path') : undefined;
 	const fs = typeof require === 'function' ? require('fs') : undefined;
@@ -45,11 +47,13 @@
 	 * @param {string=} appRoot
 	 */
 	function enableASARSupport(appRoot) {
+		// 仅支持在node.js环境
 		if (!path || !Module || typeof process === 'undefined') {
 			console.warn('enableASARSupport() is only available in node.js environments');
 			return;
 		}
 
+		// 获取node_modules文件夹路径
 		const NODE_MODULES_PATH = appRoot ? path.join(appRoot, 'node_modules') : path.join(__dirname, '../node_modules');
 
 		// Windows only:
@@ -73,6 +77,7 @@
 			NODE_MODULES_ALTERNATIVE_PATH = undefined;
 		}
 
+		// asar路径
 		const NODE_MODULES_ASAR_PATH = `${NODE_MODULES_PATH}.asar`;
 		const NODE_MODULES_ASAR_ALTERNATIVE_PATH = NODE_MODULES_ALTERNATIVE_PATH ? `${NODE_MODULES_ALTERNATIVE_PATH}.asar` : undefined;
 
