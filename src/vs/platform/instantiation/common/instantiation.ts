@@ -86,22 +86,27 @@ function storeServiceDependency(id: Function, target: Function, index: number): 
 
 /**
  * The *only* valid way to create a {{ServiceIdentifier}}.
+ * 创建唯一的ServiceIdentifier类型服务
  */
 export function createDecorator<T>(serviceId: string): ServiceIdentifier<T> {
 
+	// 服务已存在不再重新创建，直接返回服务
 	if (_util.serviceIds.has(serviceId)) {
 		return _util.serviceIds.get(serviceId)!;
 	}
 
 	const id = <any>function (target: Function, key: string, index: number): any {
+		// 必须传入3个参数
 		if (arguments.length !== 3) {
 			throw new Error('@IServiceName-decorator can only be used to decorate a parameter');
 		}
 		storeServiceDependency(id, target, index);
 	};
 
+	// 重新id函数的toString方法为返回serviceId
 	id.toString = () => serviceId;
 
+	// 将创建的服务添加到serviceIds服务映射表中
 	_util.serviceIds.set(serviceId, id);
 	return id;
 }

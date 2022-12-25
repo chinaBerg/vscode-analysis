@@ -12,12 +12,17 @@ export interface ErrorListenerUnbind {
 }
 
 // Avoid circular dependency on EventEmitter by implementing a subset of the interface.
+/**
+ * 错误处理程序
+ * 为了避免EventEmitter的循环依赖，重新实现相关的功能接口
+ */
 export class ErrorHandler {
 	private unexpectedErrorHandler: (e: any) => void;
 	private listeners: ErrorListenerCallback[];
 
 	constructor() {
 
+		// 事件队列
 		this.listeners = [];
 
 		this.unexpectedErrorHandler = function (e: any) {
@@ -35,6 +40,7 @@ export class ErrorHandler {
 		};
 	}
 
+	// 添加事件，返回一个函数，返回函数调用后可以移除添加的事件
 	addListener(listener: ErrorListenerCallback): ErrorListenerUnbind {
 		this.listeners.push(listener);
 
@@ -43,20 +49,24 @@ export class ErrorHandler {
 		};
 	}
 
+	// 循环执行所有事件
 	private emit(e: any): void {
 		this.listeners.forEach((listener) => {
 			listener(e);
 		});
 	}
 
+	// 移除事件
 	private _removeListener(listener: ErrorListenerCallback): void {
 		this.listeners.splice(this.listeners.indexOf(listener), 1);
 	}
 
+	// 设置未知错误处理程序
 	setUnexpectedErrorHandler(newUnexpectedErrorHandler: (e: any) => void): void {
 		this.unexpectedErrorHandler = newUnexpectedErrorHandler;
 	}
 
+	// 获取未知错误处理程序
 	getUnexpectedErrorHandler(): (e: any) => void {
 		return this.unexpectedErrorHandler;
 	}
@@ -72,8 +82,10 @@ export class ErrorHandler {
 	}
 }
 
+// 初始化一个ErrorHandler实例
 export const errorHandler = new ErrorHandler();
 
+// 修改errorHandler实例的错误处理程序
 export function setUnexpectedErrorHandler(newUnexpectedErrorHandler: (e: any) => void): void {
 	errorHandler.setUnexpectedErrorHandler(newUnexpectedErrorHandler);
 }

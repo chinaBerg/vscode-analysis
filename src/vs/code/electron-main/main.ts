@@ -72,6 +72,7 @@ import { PROFILES_ENABLEMENT_CONFIG } from 'vs/platform/userDataProfile/common/u
 
 /**
  * The main VS Code entry point.
+ * 真正的主进程逻辑
  *
  * Note: This class can exist more than once for example when VS Code is already
  * running and a second instance is started from the command line. It will always
@@ -82,9 +83,11 @@ class CodeMain {
 
 	main(): void {
 		try {
+			// 调用startup方法启动程序
 			this.startup();
 		} catch (error) {
 			console.error(error.message);
+			// 出现异常退出程序
 			app.exit(1);
 		}
 	}
@@ -93,6 +96,8 @@ class CodeMain {
 
 		// Set the error handler early enough so that we are not getting the
 		// default electron error dialog popping up
+		// 尽早初始化未知错误处理程序，避免electron主进程错误弹窗
+		// 这里将未知错误处理程序设置成console.error
 		setUnexpectedErrorHandler(err => console.error(err));
 
 		// Create services
@@ -145,9 +150,16 @@ class CodeMain {
 		}
 	}
 
+	/**
+	 * 创建服务
+	 * @returns
+	 */
 	private createServices(): [IInstantiationService, IProcessEnvironment, IEnvironmentMainService, ConfigurationService, StateMainService, BufferLogService, IProductService, UserDataProfilesMainService] {
+		// 初始化服务映射表
 		const services = new ServiceCollection();
+		// 初始化disposables对象集合
 		const disposables = new DisposableStore();
+		// 进程退出时销毁所有disposables，防止泄露
 		process.once('exit', () => disposables.dispose());
 
 		// Product
@@ -575,5 +587,6 @@ class CodeMain {
 }
 
 // Main Startup
+// 调用
 const code = new CodeMain();
 code.main();

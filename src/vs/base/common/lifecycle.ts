@@ -10,12 +10,15 @@ import { Iterable } from 'vs/base/common/iterator';
 
 /**
  * Enables logging of potentially leaked disposables.
+ * 启用记录可能泄漏的disposables。
  *
  * A disposable is considered leaked if it is not disposed or not registered as the child of
  * another disposable. This tracking is very simple an only works for classes that either
  * extend Disposable or use a DisposableStore. This means there are a lot of false positives.
  */
+// 控制是否启动 disposable记录器 的阀门
 const TRACK_DISPOSABLES = false;
+// disposable记录器
 let disposableTracker: IDisposableTracker | null = null;
 
 export interface IDisposableTracker {
@@ -32,6 +35,7 @@ export interface IDisposableTracker {
 
 	/**
 	 * Is called after a disposable is disposed.
+	 * 在一个disposable被disposed后调用
 	*/
 	markAsDisposed(disposable: IDisposable): void;
 
@@ -41,10 +45,12 @@ export interface IDisposableTracker {
 	markAsSingleton(disposable: IDisposable): void;
 }
 
+// 设置 disposable记录器
 export function setDisposableTracker(tracker: IDisposableTracker | null): void {
 	disposableTracker = tracker;
 }
 
+// 判断是否启动 disposable记录器
 if (TRACK_DISPOSABLES) {
 	const __is_disposable_tracked__ = '__is_disposable_tracked__';
 	setDisposableTracker(new class implements IDisposableTracker {
@@ -141,19 +147,24 @@ export function dispose<T extends IDisposable, A extends Iterable<T> = Iterable<
 export function dispose<T extends IDisposable>(disposables: Array<T>): Array<T>;
 export function dispose<T extends IDisposable>(disposables: ReadonlyArray<T>): ReadonlyArray<T>;
 export function dispose<T extends IDisposable>(arg: T | Iterable<T> | undefined): any {
+	// iterator可迭代对象
 	if (Iterable.is(arg)) {
+		// 记录错误的数组
 		const errors: any[] = [];
 
+		// 迭代所有对象，调用每个对象的dispose方法
 		for (const d of arg) {
 			if (d) {
 				try {
 					d.dispose();
 				} catch (e) {
+					// 发生错误则记录错误
 					errors.push(e);
 				}
 			}
 		}
 
+		// 错误处理
 		if (errors.length === 1) {
 			throw errors[0];
 		} else if (errors.length > 1) {
@@ -162,6 +173,7 @@ export function dispose<T extends IDisposable>(arg: T | Iterable<T> | undefined)
 
 		return Array.isArray(arg) ? [] : arg;
 	} else if (arg) {
+		// 调用对象的dispose方法
 		arg.dispose();
 		return arg;
 	}
@@ -200,10 +212,13 @@ export function toDisposable(fn: () => void): IDisposable {
 
 /**
  * Manages a collection of disposable values.
+ * 管理disposable集合
  *
  * This is the preferred way to manage multiple disposables. A `DisposableStore` is safer to work with than an
  * `IDisposable[]` as it considers edge cases, such as registering the same value multiple times or adding an item to a
  * store that has already been disposed of.
+ * 这是管理多个disposables的首选方式。`DisposableStore` 考虑了更多边界情况，因此比 `IDisposable[]` 更安全，
+ * 例如多次注册了相同的值或添加了disposed的值
  */
 export class DisposableStore implements IDisposable {
 
@@ -222,11 +237,13 @@ export class DisposableStore implements IDisposable {
 	 * Any future disposables added to this object will be disposed of on `add`.
 	 */
 	public dispose(): void {
+		// 如果已处理，则return
 		if (this._isDisposed) {
 			return;
 		}
 
 		markAsDisposed(this);
+		// 标记该对象状态为已处理
 		this._isDisposed = true;
 		this.clear();
 	}
@@ -240,15 +257,19 @@ export class DisposableStore implements IDisposable {
 
 	/**
 	 * Dispose of all registered disposables but do not mark this object as disposed.
+	 * dispose所有已注册的disposables（就是调用每个disposable的dispose方法），但是不标记该对象为disposed状态
 	 */
 	public clear(): void {
+		// disposables数量为空则不处理
 		if (this._toDispose.size === 0) {
 			return;
 		}
 
 		try {
+			// 依次迭代调用每个disposable的dispose方法
 			dispose(this._toDispose);
 		} finally {
+			// 清空disposables
 			this._toDispose.clear();
 		}
 	}
@@ -260,6 +281,7 @@ export class DisposableStore implements IDisposable {
 		if (!o) {
 			return o;
 		}
+		// 不能对自己注册disposable
 		if ((o as unknown as DisposableStore) === this) {
 			throw new Error('Cannot register a disposable on itself!');
 		}
