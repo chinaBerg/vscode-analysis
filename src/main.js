@@ -78,6 +78,7 @@ if (portable && portable.isPortable) {
 }
 
 // Register custom schemes with privileges
+// 注册自定义schema
 protocol.registerSchemesAsPrivileged([
 	{
 		scheme: 'vscode-webview',
@@ -119,7 +120,9 @@ const electronLocale = (!locale || locale === 'qps-ploc') ? 'en' : locale;
 app.commandLine.appendSwitch('lang', electronLocale);
 
 // Load our code once ready
+// app ready事件触发
 app.once('ready', function () {
+	// 如果传递了trace参数启动性能追踪器
 	if (args['trace']) {
 		const contentTracing = require('electron').contentTracing;
 
@@ -128,8 +131,10 @@ app.once('ready', function () {
 			traceOptions: args['trace-options'] || 'record-until-full,enable-sampling'
 		};
 
+		// 启动性能追踪器，进入程序
 		contentTracing.startRecording(traceOptions).finally(() => onReady());
 	} else {
+		// 进入程序
 		onReady();
 	}
 });
@@ -143,11 +148,13 @@ app.once('ready', function () {
 function startup(codeCachePath, nlsConfig) {
 	nlsConfig._languagePackSupport = true;
 
+	// 设置process环境变量
 	process.env['VSCODE_NLS_CONFIG'] = JSON.stringify(nlsConfig);
 	process.env['VSCODE_CODE_CACHE_PATH'] = codeCachePath || '';
 
 	// Load main in AMD
 	perf.mark('code/willLoadMainBundle'); // 记录用amd开始加载main的时间戳
+	// 通过amd加载main逻辑
 	require('./bootstrap-amd').load('vs/code/electron-main/main', () => {
 		perf.mark('code/didLoadMainBundle'); // 记录amd加载main完成的时间戳
 	});
@@ -158,6 +165,7 @@ async function onReady() {
 	perf.mark('code/mainAppReady');
 
 	try {
+		// 确保codeCachePath文件夹存在、解析nls配置
 		const [, nlsConfig] = await Promise.all([mkdirpIgnoreError(codeCachePath), resolveNlsConfiguration()]);
 
 		startup(codeCachePath, nlsConfig);
@@ -525,11 +533,13 @@ function registerListeners() {
 function getCodeCachePath() {
 
 	// explicitly disabled via CLI args
+	// 显式禁用了cache数据
 	if (process.argv.indexOf('--no-cached-data') > 0) {
 		return undefined;
 	}
 
 	// running out of sources
+	// dev环境不cache
 	if (process.env['VSCODE_DEV']) {
 		return undefined;
 	}
@@ -554,6 +564,7 @@ function mkdirp(dir) {
 }
 
 /**
+ * 确保指定的文件夹存在，不存在则新建
  * @param {string | undefined} dir
  * @returns {Promise<string | undefined>}
  */
