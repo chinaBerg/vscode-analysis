@@ -101,6 +101,7 @@ class CodeMain {
 		setUnexpectedErrorHandler(err => console.error(err));
 
 		// Create services
+		// 创建所有服务
 		const [instantiationService, instanceEnvironment, environmentMainService, configurationService, stateMainService, bufferLogService, productService, userDataProfilesMainService] = this.createServices();
 
 		try {
@@ -111,12 +112,17 @@ class CodeMain {
 			} catch (error) {
 
 				// Show a dialog for errors that can be resolved by the user
+				// 处理可以由用户解决的错误弹窗
 				this.handleStartupDataDirError(environmentMainService, productService.nameLong, error);
 
 				throw error;
 			}
 
 			// Startup
+			// 启动
+			// instantiationService.invokeFunction()调用后立即执行内部函数 async accessor => {}
+			// async accessor => {} 内部可以通过accessor获取所有的服务
+			// await 等待的是 async accessor => {} 的调用结果
 			await instantiationService.invokeFunction(async accessor => {
 				const logService = accessor.get(ILogService);
 				const lifecycleMainService = accessor.get(ILifecycleMainService);
@@ -143,6 +149,7 @@ class CodeMain {
 					evt.join(FSPromises.unlink(environmentMainService.mainLockfile).catch(() => { /* ignored */ }));
 				});
 
+				// 实例化CodeApplication并且调用实例的startup方法
 				return instantiationService.createInstance(CodeApplication, mainProcessNodeIpcServer, instanceEnvironment).startup();
 			});
 		} catch (error) {
@@ -227,6 +234,9 @@ class CodeMain {
 		// Protocol (instantiated early and not using sync descriptor for security reasons)
 		services.set(IProtocolMainService, new ProtocolMainService(environmentMainService, userDataProfilesMainService, logService));
 
+		/**
+		 * new InstantiationService(services, true) 创建一个services的引用服务，控制其服务的访问以及实例化等逻辑
+		 */
 		return [new InstantiationService(services, true), instanceEnvironment, environmentMainService, configurationService, stateMainService, bufferLogService, productService, userDataProfilesMainService];
 	}
 
@@ -401,6 +411,7 @@ class CodeMain {
 		return mainProcessNodeIpcServer;
 	}
 
+	// 处理启动程序时用户数据目录权限相关错误
 	private handleStartupDataDirError(environmentMainService: IEnvironmentMainService, title: string, error: NodeJS.ErrnoException): void {
 		if (error.code === 'EACCES' || error.code === 'EPERM') {
 			const directories = coalesce([environmentMainService.userDataPath, environmentMainService.extensionsPath, XDG_RUNTIME_DIR]).map(folder => getPathLabel(URI.file(folder), { os: OS, tildify: environmentMainService }));
@@ -413,6 +424,7 @@ class CodeMain {
 		}
 	}
 
+	// 展示启动警告弹窗
 	private showStartupWarningDialog(message: string, detail: string, title: string): void {
 		// use sync variant here because we likely exit after this method
 		// due to startup issues and otherwise the dialog seems to disappear
