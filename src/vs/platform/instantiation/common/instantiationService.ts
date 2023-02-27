@@ -35,6 +35,8 @@ export class InstantiationService implements IInstantiationService {
 	private _globalGraphImplicitDependency?: string;
 
 	constructor(
+		// 注意_services是私有属性，外部无法访问
+		// 外部只能通过调用invokeFunction实例方法，在方法函数周期内通过参数间接访问_services服务
 		private readonly _services: ServiceCollection = new ServiceCollection(),
 		private readonly _strict: boolean = false,
 		private readonly _parent?: InstantiationService,
@@ -145,7 +147,7 @@ export class InstantiationService implements IInstantiationService {
 		}
 
 		// now create the instance
-		// 实例化ctor，并且把传入的服务和依赖注入的所有服务作为实例化ctor的参数（修正传入和期望的之后）
+		// 实例化ctor，并且把传入的服务和依赖注入的所有服务作为实例化ctor的参数（修正传入和期望之后的）
 		return Reflect.construct<any, T>(ctor, args.concat(serviceArgs));
 	}
 
