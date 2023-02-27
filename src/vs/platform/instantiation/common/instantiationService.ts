@@ -90,6 +90,8 @@ export class InstantiationService implements IInstantiationService {
 		let result: any;
 		if (ctorOrDescriptor instanceof SyncDescriptor) {
 			_trace = Trace.traceCreation(this._enableTracing, ctorOrDescriptor.ctor);
+			// 如果待实例化参数时SyncDescriptor实例，则格式化相关参数
+			// 例如: createInstance(SyncDescriptor(AClass, [OtherServive1, ...]))
 			result = this._createInstance(ctorOrDescriptor.ctor, ctorOrDescriptor.staticArguments.concat(rest), _trace);
 		} else {
 			_trace = Trace.traceCreation(this._enableTracing, ctorOrDescriptor);
