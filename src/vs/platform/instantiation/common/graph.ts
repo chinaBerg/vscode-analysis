@@ -9,6 +9,9 @@ export class Node<T> {
 	readonly incoming = new Map<string, Node<T>>();
 	readonly outgoing = new Map<string, Node<T>>();
 
+	// 等同于：
+	// this.key = key
+	// this.data = data
 	constructor(
 		readonly key: string,
 		readonly data: T
@@ -50,15 +53,22 @@ export class Graph<T> {
 		}
 	}
 
+	/**
+	 * 查询或插入节点
+	 */
 	lookupOrInsertNode(data: T): Node<T> {
+		// data调用自定义的_hashFn方法转换成key字符串
 		const key = this._hashFn(data);
+		// 根据key获取节点
 		let node = this._nodes.get(key);
 
+		// 节点不存在则创建并插入节点
 		if (!node) {
 			node = new Node(key, data);
 			this._nodes.set(key, node);
 		}
 
+		// 返回节点
 		return node;
 	}
 

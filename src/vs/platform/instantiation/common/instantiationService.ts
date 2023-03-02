@@ -169,7 +169,8 @@ export class InstantiationService implements IInstantiationService {
 		if (!instanceOrDesc && this._parent) {
 			return this._parent._getServiceInstanceOrDescriptor(id);
 		} else {
-			// 找到即返回值
+			// _services中存在该实例则返回实例
+			// _services中不存在，且不存在_parent，则返回undefined
 			return instanceOrDesc;
 		}
 	}
@@ -209,22 +210,30 @@ export class InstantiationService implements IInstantiationService {
 	private _createAndCacheServiceInstance<T>(id: ServiceIdentifier<T>, desc: SyncDescriptor<T>, _trace: Trace): T {
 
 		type Triple = { id: ServiceIdentifier<any>; desc: SyncDescriptor<any>; _trace: Trace };
+		// 实例化一个依赖图
 		const graph = new Graph<Triple>(data => data.id.toString());
 
 		let cycleCount = 0;
 		const stack = [{ id, desc, _trace }];
+
+		// while循环通过DFS方式查找ctor的依赖及子依赖，
+		// 收集所有的SyncDescriptor类型的依赖
 		while (stack.length) {
 			const item = stack.pop()!;
 			graph.lookupOrInsertNode(item);
 
 			// a weak but working heuristic for cycle checks
+			// 一种不健壮但是有效的“检查是否产生了循环依赖”的方式
+			// 实际使用中的依赖数量会远小于1000次，因此这里假定只要大于1000次就是产生了循环依赖
 			if (cycleCount++ > 1000) {
 				throw new CyclicDependencyError(graph);
 			}
 
 			// check all dependencies for existence and if they need to be created first
+			// 遍历ctor的所有依赖
 			for (const dependency of _util.getServiceDependencies(item.desc.ctor)) {
 
+				// 依赖未注入，则抛错或者warn
 				const instanceOrDesc = this._getServiceInstanceOrDescriptor(dependency.id);
 				if (!instanceOrDesc) {
 					this._throwIfStrict(`[createInstance] ${id} depends on ${dependency.id} which is NOT registered.`, true);
@@ -233,14 +242,18 @@ export class InstantiationService implements IInstantiationService {
 				// take note of all service dependencies
 				this._globalGraph?.insertEdge(String(item.id), String(dependency.id));
 
+				// 依赖依旧是SyncDescriptor则继续递归下去
+				// 深度优先的递归逻辑
 				if (instanceOrDesc instanceof SyncDescriptor) {
 					const d = { id: dependency.id, desc: instanceOrDesc, _trace: item._trace.branch(dependency.id, true) };
+					// 构建子依赖（graph中的子节点）与父依赖（graph中的父节点）的关系（图依赖关系）
 					graph.insertEdge(item, d);
 					stack.push(d);
 				}
 			}
 		}
 
+		// 遍历依赖图
 		while (true) {
 			const roots = graph.roots();
 
@@ -260,7 +273,9 @@ export class InstantiationService implements IInstantiationService {
 				const instanceOrDesc = this._getServiceInstanceOrDescriptor(data.id);
 				if (instanceOrDesc instanceof SyncDescriptor) {
 					// create instance and overwrite the service collections
+					// 创建实例
 					const instance = this._createServiceInstanceWithOwner(data.id, data.desc.ctor, data.desc.staticArguments, data.desc.supportsDelayedInstantiation, data._trace);
+					// 将创建的实例添加到this._services
 					this._setServiceInstance(data.id, instance);
 				}
 				graph.removeNode(data);
@@ -271,6 +286,7 @@ export class InstantiationService implements IInstantiationService {
 
 	private _createServiceInstanceWithOwner<T>(id: ServiceIdentifier<T>, ctor: any, args: any[] = [], supportsDelayedInstantiation: boolean, _trace: Trace): T {
 		if (this._services.get(id) instanceof SyncDescriptor) {
+			// 调用创建实例的方法
 			return this._createServiceInstance(id, ctor, args, supportsDelayedInstantiation, _trace);
 		} else if (this._parent) {
 			return this._parent._createServiceInstanceWithOwner(id, ctor, args, supportsDelayedInstantiation, _trace);
@@ -282,6 +298,7 @@ export class InstantiationService implements IInstantiationService {
 	private _createServiceInstance<T>(id: ServiceIdentifier<T>, ctor: any, args: any[] = [], supportsDelayedInstantiation: boolean, _trace: Trace): T {
 		if (!supportsDelayedInstantiation) {
 			// eager instantiation
+			// 如果不是延迟实例化，则直接创建实例
 			return this._createInstance(ctor, args, _trace);
 
 		} else {
