@@ -22,10 +22,15 @@ export class Graph<T> {
 
 	private readonly _nodes = new Map<string, Node<T>>();
 
+	/**
+	 * @param _hashFn 自定义节点key的生成函数
+	 */
 	constructor(private readonly _hashFn: (element: T) => string) {
 		// empty
 	}
 
+	// 查找图中的所有根节点
+	// 根节点是所有未被其他节点依赖的节点
 	roots(): Node<T>[] {
 		const ret: Node<T>[] = [];
 		for (const node of this._nodes.values()) {
@@ -36,6 +41,8 @@ export class Graph<T> {
 		return ret;
 	}
 
+	// 插入节点
+	// 并且建立节点直接的依赖关系
 	insertEdge(from: T, to: T): void {
 		const fromNode = this.lookupOrInsertNode(from);
 		const toNode = this.lookupOrInsertNode(to);
@@ -44,6 +51,8 @@ export class Graph<T> {
 		toNode.incoming.set(fromNode.key, fromNode);
 	}
 
+	// 删除节点
+	// 同时删除所有节点中对被删除节点的依赖关系
 	removeNode(data: T): void {
 		const key = this._hashFn(data);
 		this._nodes.delete(key);
@@ -96,6 +105,8 @@ export class Graph<T> {
 	findCycleSlow() {
 		for (const [id, node] of this._nodes) {
 			const seen = new Set<string>([id]);
+			// 查找出现循环依赖的链路
+			// 具体实现在_findCycle函数中
 			const res = this._findCycle(node, seen);
 			if (res) {
 				return res;
@@ -105,11 +116,16 @@ export class Graph<T> {
 	}
 
 	private _findCycle(node: Node<T>, seen: Set<string>): string | undefined {
+		// 遍历所有节点
+		// 递归每个节点在自己依赖节点及依赖节点的依赖节点中（深度遍历）是否存在循环引用
+		// e.g. A -> B/C, B -> A，A节点依赖B节点，B的outgoing依赖节点中也依赖了A，便出现了循环依赖
+		// 此时根据出现循环依赖的链路，输出依赖链路的message消息，如：'A -> B'
 		for (const [id, outgoing] of node.outgoing) {
 			if (seen.has(id)) {
 				return [...seen, id].join(' -> ');
 			}
 			seen.add(id);
+			// 递归
 			const value = this._findCycle(outgoing, seen);
 			if (value) {
 				return value;

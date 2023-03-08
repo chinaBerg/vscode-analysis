@@ -210,7 +210,10 @@ export class InstantiationService implements IInstantiationService {
 	private _createAndCacheServiceInstance<T>(id: ServiceIdentifier<T>, desc: SyncDescriptor<T>, _trace: Trace): T {
 
 		type Triple = { id: ServiceIdentifier<any>; desc: SyncDescriptor<any>; _trace: Trace };
-		// 实例化一个依赖图
+		// 实例化一个依赖图，非常巧妙的一个地方在于：
+		// 实例化Graph的时候传入了自定义的的_hashFn函数，函数逻辑为调用装饰器的toString方法
+		// 而createDecorator返回的装饰器的toString方法都被重写成了返回一个key字符串
+		// @see instantiation.ts -> createDecorator函数 -> id.toString () => serviceId;
 		const graph = new Graph<Triple>(data => data.id.toString());
 
 		let cycleCount = 0;
@@ -226,6 +229,8 @@ export class InstantiationService implements IInstantiationService {
 			// 一种不健壮但是有效的“检查是否产生了循环依赖”的方式
 			// 实际使用中的依赖数量会远小于1000次，因此这里假定只要大于1000次就是产生了循环依赖
 			if (cycleCount++ > 1000) {
+				// 抛错循环依赖错误
+				// 会尝试找出循环依赖链路作为message内容
 				throw new CyclicDependencyError(graph);
 			}
 

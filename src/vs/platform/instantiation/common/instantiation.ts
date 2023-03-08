@@ -118,6 +118,9 @@ export function createDecorator<T>(serviceId: string): ServiceIdentifier<T> {
 	};
 
 	// 重写id函数的toString方法为返回serviceId
+	// 非常巧妙的让调用to.toString()方法时获取到的是serviceId，也就是创建装饰器的id标识字符串
+	// e.g. instantionService = createDecorator('InstantionService'); instantionService.toString()得到的结果是'InstantionService'字符串
+	// 比如一个作用场景是出现循环依赖时，方便输出'serviceId -> serviceId2 -> serviceId3'这样直观的信息提示
 	id.toString = () => serviceId;
 
 	// 将创建的服务添加到serviceIds服务映射表中
