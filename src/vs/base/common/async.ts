@@ -1135,15 +1135,19 @@ declare function cancelIdleCallback(handle: number): void;
 
 (function () {
 	if (typeof requestIdleCallback !== 'function' || typeof cancelIdleCallback !== 'function') {
+		// 不兼容requestIdleCallback的hack方案，不是polyfill
 		runWhenIdle = (runner) => {
 			setTimeout0(() => {
+				// 取消执行
 				if (disposed) {
 					return;
 				}
+				// 保证64fps
 				const end = Date.now() + 15; // one frame at 64fps
 				runner(Object.freeze({
 					didTimeout: true,
 					timeRemaining() {
+						// 达不到64fps时直接返回空闲时间为0
 						return Math.max(0, end - Date.now());
 					}
 				}));
@@ -1159,6 +1163,7 @@ declare function cancelIdleCallback(handle: number): void;
 			};
 		};
 	} else {
+		// 原生语法支持的实现
 		runWhenIdle = (runner, timeout?) => {
 			const handle: number = requestIdleCallback(runner, typeof timeout === 'number' ? { timeout } : undefined);
 			let disposed = false;
@@ -1168,6 +1173,7 @@ declare function cancelIdleCallback(handle: number): void;
 						return;
 					}
 					disposed = true;
+					// 取消空闲执行
 					cancelIdleCallback(handle);
 				}
 			};
@@ -1198,6 +1204,8 @@ export class IdleValue<T> {
 				this._didRun = true;
 			}
 		};
+		// 初始化IdleValue后立即会运行runWhenIdle函数
+		// 使得一旦处于空闲时期就立即执行this._executor方法创建value
 		this._handle = runWhenIdle(() => this._executor());
 	}
 
@@ -1205,14 +1213,21 @@ export class IdleValue<T> {
 		this._handle.dispose();
 	}
 
+	/**
+	 * IdleValue的value策略是idle-until-urgent，即在空闲时创建value策略
+	 * 如果需要使用value时但是value未创建或未创建完成，则立即进行创建并返回创建的value
+	 */
 	get value(): T {
 		if (!this._didRun) {
+			// 确保调用IDisposable对象的dispose方法销毁可能的正在创建逻辑
 			this._handle.dispose();
+			// 立即创建value
 			this._executor();
 		}
 		if (this._error) {
 			throw this._error;
 		}
+		// value被创建完成状态则返回value
 		return this._value!;
 	}
 
