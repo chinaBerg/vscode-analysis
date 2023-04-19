@@ -248,7 +248,7 @@ export class InstantiationService implements IInstantiationService {
 				this._globalGraph?.insertEdge(String(item.id), String(dependency.id));
 
 				// 依赖依旧是SyncDescriptor则继续递归下去
-				// 深度优先的递归逻辑
+				// 广度优先的递归逻辑
 				if (instanceOrDesc instanceof SyncDescriptor) {
 					const d = { id: dependency.id, desc: instanceOrDesc, _trace: item._trace.branch(dependency.id, true) };
 					// 构建子依赖（graph中的子节点）与父依赖（graph中的父节点）的关系（图依赖关系）
@@ -264,7 +264,9 @@ export class InstantiationService implements IInstantiationService {
 
 			// if there is no more roots but still
 			// nodes in the graph we have a cycle
+			// 结束依赖图遍历的终止条件
 			if (roots.length === 0) {
+				// 处理完了图的所有节点后但是依赖图遗留节点则说明存在循环依赖
 				if (!graph.isEmpty()) {
 					throw new CyclicDependencyError(graph);
 				}
@@ -276,6 +278,7 @@ export class InstantiationService implements IInstantiationService {
 				// instantiating a dependency might have side-effect and recursively trigger instantiation
 				// so that some dependencies are now fullfilled already.
 				const instanceOrDesc = this._getServiceInstanceOrDescriptor(data.id);
+				// 依赖未被实例化则进行实例化（区分立即实例化还是延迟实例化）
 				if (instanceOrDesc instanceof SyncDescriptor) {
 					// create instance and overwrite the service collections
 					// 创建实例
@@ -283,9 +286,11 @@ export class InstantiationService implements IInstantiationService {
 					// 将创建的实例添加到this._services
 					this._setServiceInstance(data.id, instance);
 				}
+				// 处理完依赖图的一个节点就删除一个节点
 				graph.removeNode(data);
 			}
 		}
+		// 处理完所有的依赖后返回当前的目标服务
 		return <T>this._getServiceInstanceOrDescriptor(id);
 	}
 
