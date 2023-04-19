@@ -166,8 +166,11 @@ export function dispose<T extends IDisposable>(arg: T | Iterable<T> | undefined)
 
 		// 错误处理
 		if (errors.length === 1) {
+			// 只有单个错误，直接抛出错误
 			throw errors[0];
 		} else if (errors.length > 1) {
+			// 多个错误，抛出一个聚合错误
+			// AggregateError是实验性API @see https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/AggregateError
 			throw new AggregateError(errors, 'Encountered errors while disposing of store');
 		}
 
