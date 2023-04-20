@@ -220,18 +220,22 @@ export const setTimeout0IsFaster = (typeof globals.postMessage === 'function' &&
  * that browsers set when the nesting level is > 5.
  */
 export const setTimeout0 = (() => {
+	// 解决setTimeout(, 0)在嵌套层级大于等于5时带来的4ms最小延迟
+	// 优先使用postMessage模拟setTimeout(, 0)
 	if (setTimeout0IsFaster) {
 		interface IQueueElement {
 			id: number;
 			callback: () => void;
 		}
 		const pending: IQueueElement[] = [];
+		// 接收事件
 		globals.addEventListener('message', (e: MessageEvent) => {
 			if (e.data && e.data.vscodeScheduleAsyncWork) {
 				for (let i = 0, len = pending.length; i < len; i++) {
 					const candidate = pending[i];
 					if (candidate.id === e.data.vscodeScheduleAsyncWork) {
 						pending.splice(i, 1);
+						// 调用回调
 						candidate.callback();
 						return;
 					}
@@ -245,9 +249,11 @@ export const setTimeout0 = (() => {
 				id: myId,
 				callback: callback
 			});
+			// 给自己发送事件
 			globals.postMessage({ vscodeScheduleAsyncWork: myId }, '*');
 		};
 	}
+	// 不支持postMessage则使用setTimeout(, 0)
 	return (callback: () => void) => setTimeout(callback);
 })();
 
