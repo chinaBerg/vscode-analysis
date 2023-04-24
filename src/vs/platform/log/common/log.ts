@@ -137,6 +137,7 @@ export abstract class AbstractLogger extends Disposable implements ILogger {
 	setLevel(level: LogLevel): void {
 		if (this.level !== level) {
 			this.level = level;
+			// level变化后的回调
 			this._onDidChangeLogLevel.fire(this.level);
 		}
 	}
@@ -217,6 +218,7 @@ export class ConsoleMainLogger extends AbstractLogger implements ILogger {
 	constructor(logLevel: LogLevel = DEFAULT_LOG_LEVEL) {
 		super();
 		this.setLevel(logLevel);
+		// 非windows环境下通过ANSI转义序列给console内容添加颜色
 		this.useColors = !isWindows;
 	}
 
@@ -380,59 +382,74 @@ export class AdapterLogger extends AbstractLogger implements ILogger {
 	}
 }
 
+/**
+ * MultiplexLogService 多重日志服务
+ */
 export class MultiplexLogService extends AbstractLogger implements ILogService {
 	declare readonly _serviceBrand: undefined;
 
 	constructor(private readonly logServices: ReadonlyArray<ILogger>) {
 		super();
 		if (logServices.length) {
+			// 以第一个日志服务的日志级别设置所有日志服务的级别
 			this.setLevel(logServices[0].getLevel());
 		}
 	}
 
+	// 依次设置所有日志服务的日志级别
 	override setLevel(level: LogLevel): void {
 		for (const logService of this.logServices) {
+			// 调用背后还会触发每个日志服务可能继承的_onDidChangeLogLevel.fire事件
 			logService.setLevel(level);
 		}
+		// 设置完成后调用一次MultiplexLogService自身继承的setLevel方法
+		// 从而触发MultiplexLogService自身继承的_onDidChangeLogLevel.fire事件
 		super.setLevel(level);
 	}
 
+	// 依次调用每个日志服务的trace方法
 	trace(message: string, ...args: any[]): void {
 		for (const logService of this.logServices) {
 			logService.trace(message, ...args);
 		}
 	}
 
+	// 依次调用每个日志服务的debug方法
 	debug(message: string, ...args: any[]): void {
 		for (const logService of this.logServices) {
 			logService.debug(message, ...args);
 		}
 	}
 
+	// 依次调用每个日志服务的info方法
 	info(message: string, ...args: any[]): void {
 		for (const logService of this.logServices) {
 			logService.info(message, ...args);
 		}
 	}
 
+	// 依次调用每个日志服务的warn方法
 	warn(message: string, ...args: any[]): void {
 		for (const logService of this.logServices) {
 			logService.warn(message, ...args);
 		}
 	}
 
+	// 依次调用每个日志服务的error方法
 	error(message: string | Error, ...args: any[]): void {
 		for (const logService of this.logServices) {
 			logService.error(message, ...args);
 		}
 	}
 
+	// 依次调用每个日志服务的flush方法
 	flush(): void {
 		for (const logService of this.logServices) {
 			logService.flush();
 		}
 	}
 
+	// 依次调用每个日志服务的dispose方法
 	override dispose(): void {
 		for (const logService of this.logServices) {
 			logService.dispose();
@@ -490,6 +507,9 @@ interface ILoggerItem {
 	logLevel: LogLevel | undefined;
 }
 
+/**
+ * LoggerService的抽象类
+ */
 export abstract class AbstractLoggerService extends Disposable implements ILoggerService {
 
 	declare readonly _serviceBrand: undefined;
@@ -512,10 +532,15 @@ export abstract class AbstractLoggerService extends Disposable implements ILogge
 		return this.loggerItems.get(resource)?.logger;
 	}
 
+	/**
+	 * 创建日志器
+	 * 如果日志器已存在则直接返回，避免重复创建
+	 */
 	createLogger(resource: URI, options?: ILoggerOptions, logLevel?: LogLevel): ILogger {
 		let logger = this.loggerItems.get(resource)?.logger;
 		if (!logger) {
 			logLevel = options?.always ? LogLevel.Trace : logLevel;
+			// 调用子类实现的doCreateLogger方法创建日志器
 			logger = this.doCreateLogger(resource, logLevel ?? this.logLevel, options);
 			this.loggerItems.set(resource, { logger, logLevel });
 		}
@@ -556,6 +581,7 @@ export abstract class AbstractLoggerService extends Disposable implements ILogge
 		super.dispose();
 	}
 
+	// 创建日志器的抽象方法，必须由子类实现
 	protected abstract doCreateLogger(resource: URI, logLevel: LogLevel, options?: ILoggerOptions): ILogger;
 }
 

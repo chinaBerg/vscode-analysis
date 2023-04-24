@@ -43,6 +43,11 @@ class ResourceMapEntry<T> {
 
 export class ResourceMap<T> implements Map<URI, T> {
 
+	/**
+	 * 定义灵活的取Key函数，默认读取toString()方法
+	 * 调用方通过指定取Key函数，不再需要调用实例方法时到处传入指定的属性，而是直接传入源数据项即可
+	 * 简化传参和减少认知，例如只需要xx.set(item) 而不是 xx.set('one-prop')
+	 */
 	private static readonly defaultToKey = (resource: URI) => resource.toString();
 
 	readonly [Symbol.toStringTag] = 'ResourceMap';

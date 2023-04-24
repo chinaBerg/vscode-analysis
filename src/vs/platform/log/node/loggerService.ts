@@ -16,6 +16,9 @@ export class LoggerService extends AbstractLoggerService implements ILoggerServi
 		super(logService.getLevel(), logService.onDidChangeLogLevel);
 	}
 
+	/**
+	 * 实现抽象类AbstractLoggerService的创建日志器的方法
+	 */
 	protected doCreateLogger(resource: URI, logLevel: LogLevel, options?: ILoggerOptions): ILogger {
 		return new SpdLogLogger(options?.name || generateUuid(), resource.fsPath, !options?.donotRotate, !!options?.donotUseFormatters, logLevel);
 	}

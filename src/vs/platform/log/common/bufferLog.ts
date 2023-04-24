@@ -24,20 +24,26 @@ export class BufferLogService extends AbstractMessageLogger implements ILogServi
 		}));
 	}
 
+	// 设置logger日志器
 	set logger(logger: ILogger) {
 		this._logger = logger;
 
+		// 设置完成后调用日志器的相关方法输出/IO所有的缓存日志
 		for (const { level, message } of this.buffer) {
 			log(logger, level, message);
 		}
 
+		// 清空已缓存日志
 		this.buffer = [];
 	}
 
+	// 实现AbstractMessageLogger抽象类的log方法，用于在trace/info/error等方法中调用this.log
 	protected log(level: LogLevel, message: string): void {
+		// 如果指定了_logger日志器，则直接调用日志器的相关方法输出日志
 		if (this._logger) {
 			log(this._logger, level, message);
 		} else if (this.getLevel() <= level) {
+			// 没有调用日志器则缓存日志数据，等待设置日志器时再完整触发一次输出
 			this.buffer.push({ level, message });
 		}
 	}

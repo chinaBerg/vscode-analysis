@@ -79,6 +79,7 @@ declare const navigator: INavigator;
 // Web environment
 if (typeof navigator === 'object' && !isElectronRenderer) {
 	_userAgent = navigator.userAgent;
+	// Web环境通过navigator.userAgent值包含Windows字符串判断是否为Windows环境
 	_isWindows = _userAgent.indexOf('Windows') >= 0;
 	_isMacintosh = _userAgent.indexOf('Macintosh') >= 0;
 	_isIOS = (_userAgent.indexOf('Macintosh') >= 0 || _userAgent.indexOf('iPad') >= 0 || _userAgent.indexOf('iPhone') >= 0) && !!navigator.maxTouchPoints && navigator.maxTouchPoints > 0;
@@ -101,6 +102,7 @@ if (typeof navigator === 'object' && !isElectronRenderer) {
 
 // Native environment
 else if (typeof nodeProcess === 'object') {
+	// Node或原生环境通过platform属性判断是否为Windows环境
 	_isWindows = (nodeProcess.platform === 'win32');
 	_isMacintosh = (nodeProcess.platform === 'darwin');
 	_isLinux = (nodeProcess.platform === 'linux');

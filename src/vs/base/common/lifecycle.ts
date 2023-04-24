@@ -135,6 +135,8 @@ export interface IDisposable {
  * Check if `thing` is {@link IDisposable disposable}.
  */
 export function isDisposable<E extends object>(thing: E): thing is E & IDisposable {
+	// 鸭式辨型思想
+	// 认为拥有dispose方法且dispose定义的形参个数为0的就是一个IDisposable
 	return typeof (<IDisposable>thing).dispose === 'function' && (<IDisposable>thing).dispose.length === 0;
 }
 

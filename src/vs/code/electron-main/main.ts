@@ -140,6 +140,9 @@ class CodeMain {
 				});
 
 				// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
+				// 考虑到性能问题，延迟创建spdlog进行日志输出
+				// loggerService.createLogger会初始化spdlog库作为日志器，
+				// 日志器赋值给bufferLogService.logger时，bufferLogService服务会立即输出或IO自身缓存的日志数据
 				bufferLogService.logger = loggerService.createLogger(URI.file(join(environmentMainService.logsPath, 'main.log')), { name: 'main' });
 
 				// Lifecycle
@@ -181,7 +184,11 @@ class CodeMain {
 		// Log: We need to buffer the spdlog logs until we are sure
 		// we are the only instance running, otherwise we'll have concurrent
 		// log file access on Windows (https://github.com/microsoft/vscode/issues/41218)
+		// 初始化后的bufferLogService服务，在设置bufferLogService.logger之前，日志都存在缓存区
+		// 设置bufferLogService.logger之后，会立即消费缓存区日志数据进行输出
 		const bufferLogService = new BufferLogService();
+		// 创建多级日志
+		// 传递给MultiplexLogService的所有日志服务都会依次进行输出
 		const logService = disposables.add(new MultiplexLogService([new ConsoleMainLogger(getLogLevel(environmentMainService)), bufferLogService]));
 		services.set(ILogService, logService);
 

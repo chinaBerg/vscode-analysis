@@ -22,7 +22,9 @@ async function createSpdLogLogger(name: string, logfilePath: string, filesize: n
 	try {
 		const _spdlog = await import('spdlog');
 		_spdlog.setFlushOn(SpdLogLevel.Trace);
+		// 创建异步回滚的日志器
 		const logger = await _spdlog.createAsyncRotatingLogger(name, logfilePath, filesize, filecount);
+		// 是否格式化日志
 		if (donotUseFormatters) {
 			logger.clearFormatters();
 		} else {
@@ -30,6 +32,7 @@ async function createSpdLogLogger(name: string, logfilePath: string, filesize: n
 		}
 		return logger;
 	} catch (e) {
+		// 日志器创建不败不crash
 		console.error(e);
 	}
 	return null;
@@ -64,6 +67,9 @@ function setLogLevel(logger: spdlog.Logger, level: LogLevel): void {
 	}
 }
 
+/**
+ * 利用spdlog库进行日志的输出和IO
+ */
 export class SpdLogLogger extends AbstractMessageLogger implements ILogger {
 
 	private buffer: ILog[] = [];
@@ -89,11 +95,13 @@ export class SpdLogLogger extends AbstractMessageLogger implements ILogger {
 
 	private async _createSpdLogLogger(name: string, filepath: string, rotating: boolean, donotUseFormatters: boolean): Promise<void> {
 		const filecount = rotating ? 6 : 1;
+		// 文件大小，日志不回滚时最大30mb，回滚时为5mb
 		const filesize = (30 / filecount) * ByteSize.MB;
 		const logger = await createSpdLogLogger(name, filepath, filesize, filecount, donotUseFormatters);
 		if (logger) {
 			this._logger = logger;
 			setLogLevel(this._logger, this.getLevel());
+			// spdlog实例化成功后立即输出日志（如果存在已缓存的日志）
 			for (const { level, message } of this.buffer) {
 				log(this._logger, level, message);
 			}
@@ -103,8 +111,10 @@ export class SpdLogLogger extends AbstractMessageLogger implements ILogger {
 
 	protected log(level: LogLevel, message: string): void {
 		if (this._logger) {
+			// 调用spdlog库的相关方法输出日志
 			log(this._logger, level, message);
 		} else if (this.getLevel() <= level) {
+			// spdlog未创建文件则先缓存日志buffer
 			this.buffer.push({ level, message });
 		}
 	}
@@ -117,16 +127,19 @@ export class SpdLogLogger extends AbstractMessageLogger implements ILogger {
 		}
 	}
 
+	// 实现销毁spdlog的dispose接口
 	override dispose(): void {
 		if (this._logger) {
 			this.disposeLogger();
 		} else {
+			// 异步创建未完成，等待完成后再销毁
 			this._loggerCreationPromise.then(() => this.disposeLogger());
 		}
 	}
 
 	private disposeLogger(): void {
 		if (this._logger) {
+			// 调用spdlog的drop销毁该日志器
 			this._logger.drop();
 			this._logger = undefined;
 		}
