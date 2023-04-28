@@ -3,8 +3,13 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * Node
+ * @description 链表中的节点
+ */
 class Node<E> {
 
+	// 静态属性，一个只读的空节点
 	static readonly Undefined = new Node<any>(undefined);
 
 	element: E;
@@ -13,25 +18,34 @@ class Node<E> {
 
 	constructor(element: E) {
 		this.element = element;
+		// 指向链表中下个节点的指针
 		this.next = Node.Undefined;
+		// 指向链表中上个节点的指针
 		this.prev = Node.Undefined;
 	}
 }
 
+/**
+ * LinkedList
+ * @description 链表
+ */
 export class LinkedList<E> {
 
 	private _first: Node<E> = Node.Undefined;
 	private _last: Node<E> = Node.Undefined;
 	private _size: number = 0;
 
+	// 获取节点数量
 	get size(): number {
 		return this._size;
 	}
 
+	// 链表是否为空
 	isEmpty(): boolean {
 		return this._first === Node.Undefined;
 	}
 
+	// 清空链表
 	clear(): void {
 		let node = this._first;
 		while (node !== Node.Undefined) {
@@ -46,22 +60,26 @@ export class LinkedList<E> {
 		this._size = 0;
 	}
 
+	// 从头部插入一个节点
 	unshift(element: E): () => void {
 		return this._insert(element, false);
 	}
 
+	// 从尾部插入一个节点
 	push(element: E): () => void {
 		return this._insert(element, true);
 	}
 
 	private _insert(element: E, atTheEnd: boolean): () => void {
 		const newNode = new Node(element);
+		// 空链表时直接插入在第一个节点
 		if (this._first === Node.Undefined) {
 			this._first = newNode;
 			this._last = newNode;
 
 		} else if (atTheEnd) {
 			// push
+			// 在最后插入一个节点
 			const oldLast = this._last!;
 			this._last = newNode;
 			newNode.prev = oldLast;
@@ -69,11 +87,13 @@ export class LinkedList<E> {
 
 		} else {
 			// unshift
+			// 从前面插入一个节点
 			const oldFirst = this._first;
 			this._first = newNode;
 			newNode.next = oldFirst;
 			oldFirst.prev = newNode;
 		}
+		// 更新链表节点数量
 		this._size += 1;
 
 		let didRemove = false;
@@ -85,6 +105,7 @@ export class LinkedList<E> {
 		};
 	}
 
+	// 从头部取出一个节点
 	shift(): E | undefined {
 		if (this._first === Node.Undefined) {
 			return undefined;
@@ -95,6 +116,7 @@ export class LinkedList<E> {
 		}
 	}
 
+	// 从尾部取出一个节点
 	pop(): E | undefined {
 		if (this._last === Node.Undefined) {
 			return undefined;
@@ -132,6 +154,7 @@ export class LinkedList<E> {
 		this._size -= 1;
 	}
 
+	// 支持迭代器
 	*[Symbol.iterator](): Iterator<E> {
 		let node = this._first;
 		while (node !== Node.Undefined) {
