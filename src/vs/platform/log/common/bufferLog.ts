@@ -10,6 +10,10 @@ interface ILog {
 	message: string;
 }
 
+/**
+ * BufferLogService服务
+ * 支持缓存log数据，直到设置日志器之后再输出日志
+ */
 export class BufferLogService extends AbstractMessageLogger implements ILogService {
 
 	declare readonly _serviceBrand: undefined;
