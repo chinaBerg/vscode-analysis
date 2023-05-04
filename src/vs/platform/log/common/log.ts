@@ -59,6 +59,7 @@ export function log(logger: ILogger, level: LogLevel, message: string): void {
 	}
 }
 
+// 格式化多个日志内容，使用空格拼接
 export function format(args: any): string {
 	let result = '';
 
@@ -128,12 +129,17 @@ export interface ILoggerService {
 	getLogLevel(resource: URI): LogLevel | undefined;
 }
 
+/**
+ * 日志的抽象基类
+ */
 export abstract class AbstractLogger extends Disposable implements ILogger {
 
 	private level: LogLevel = DEFAULT_LOG_LEVEL;
 	private readonly _onDidChangeLogLevel: Emitter<LogLevel> = this._register(new Emitter<LogLevel>());
 	readonly onDidChangeLogLevel: Event<LogLevel> = this._onDidChangeLogLevel.event;
 
+	// 设置日志级别
+	// 设置完成后触发事件回调
 	setLevel(level: LogLevel): void {
 		if (this.level !== level) {
 			this.level = level;
@@ -146,10 +152,12 @@ export abstract class AbstractLogger extends Disposable implements ILogger {
 		return this.level;
 	}
 
+	// 检查日志级别是否满足
 	protected checkLogLevel(level: LogLevel): boolean {
 		return this.level !== LogLevel.Off && this.level <= level;
 	}
 
+	// 定义trace info等一些列抽象方法，需要由子类实现
 	abstract trace(message: string, ...args: any[]): void;
 	abstract debug(message: string, ...args: any[]): void;
 	abstract info(message: string, ...args: any[]): void;
@@ -158,45 +166,59 @@ export abstract class AbstractLogger extends Disposable implements ILogger {
 	abstract flush(): void;
 }
 
+/**
+ * 消息日志的抽象类
+ */
 export abstract class AbstractMessageLogger extends AbstractLogger implements ILogger {
 
+	// 子类必须实现的log方法，用于info、trace等方法中调用log方法输出
+	// 将log的实现交给子类，增加灵活性
 	protected abstract log(level: LogLevel, message: string): void;
 
+	// logAlways表示是否始终运行输出日志
 	constructor(private readonly logAlways?: boolean) {
 		super();
 	}
 
+	// 复写父类的checkLogLevel方法
+	// 只要logAlways为true或者父类的checkLogLevel方法检查通过，都运行输出日志
 	protected override checkLogLevel(level: LogLevel): boolean {
 		return this.logAlways || super.checkLogLevel(level);
 	}
 
+	// trace输出
 	trace(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Trace)) {
 			this.log(LogLevel.Trace, format([message, ...args]));
 		}
 	}
 
+	// debug输出
 	debug(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Debug)) {
 			this.log(LogLevel.Debug, format([message, ...args]));
 		}
 	}
 
+	// info输出
 	info(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Info)) {
 			this.log(LogLevel.Info, format([message, ...args]));
 		}
 	}
 
+	// warn输出
 	warn(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Warning)) {
 			this.log(LogLevel.Warning, format([message, ...args]));
 		}
 	}
 
+	// error输出
 	error(message: string | Error, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Error)) {
 
+			// 如果传递给error方法的是个Error错误而不是字符串，则取error.stach作为message内容
 			if (message instanceof Error) {
 				const array = Array.prototype.slice.call(arguments) as any[];
 				array[0] = message.stack;
@@ -211,8 +233,14 @@ export abstract class AbstractMessageLogger extends AbstractLogger implements IL
 }
 
 
+/**
+ * ConsoleMainLogger
+ * 在主进程的控制台输出日志，
+ * 输出日志时根据useColors属性判断日志是否带颜色
+ */
 export class ConsoleMainLogger extends AbstractLogger implements ILogger {
 
+	// 控制台输出日志是否带颜色
 	private useColors: boolean;
 
 	constructor(logLevel: LogLevel = DEFAULT_LOG_LEVEL) {
@@ -282,6 +310,11 @@ export class ConsoleMainLogger extends AbstractLogger implements ILogger {
 
 }
 
+/**
+ * ConsoleLogger
+ * 在控制台输出日志，
+ * 输出的日志携带样式
+ */
 export class ConsoleLogger extends AbstractLogger implements ILogger {
 
 	constructor(logLevel: LogLevel = DEFAULT_LOG_LEVEL) {
@@ -291,30 +324,35 @@ export class ConsoleLogger extends AbstractLogger implements ILogger {
 
 	trace(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Trace)) {
+			// 颜色#888的TRACE开头
 			console.log('%cTRACE', 'color: #888', message, ...args);
 		}
 	}
 
 	debug(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Debug)) {
+			// 颜色#888背景色#eee的DEBUG开头
 			console.log('%cDEBUG', 'background: #eee; color: #888', message, ...args);
 		}
 	}
 
 	info(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Info)) {
+			// 颜色#33f的INFO开头
 			console.log('%c INFO', 'color: #33f', message, ...args);
 		}
 	}
 
 	warn(message: string | Error, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Warning)) {
+			// 颜色#993的WARN开头
 			console.log('%c WARN', 'color: #993', message, ...args);
 		}
 	}
 
 	error(message: string, ...args: any[]): void {
 		if (this.checkLogLevel(LogLevel.Error)) {
+			// 颜色#f33的ERR开头
 			console.log('%c  ERR', 'color: #f33', message, ...args);
 		}
 	}
@@ -328,6 +366,9 @@ export class ConsoleLogger extends AbstractLogger implements ILogger {
 	}
 }
 
+/**
+ * AdapterLogger 日志适配器
+ */
 export class AdapterLogger extends AbstractLogger implements ILogger {
 
 	constructor(private readonly adapter: { log: (logLevel: LogLevel, args: any[]) => void }, logLevel: LogLevel = DEFAULT_LOG_LEVEL) {
@@ -585,6 +626,7 @@ export abstract class AbstractLoggerService extends Disposable implements ILogge
 	protected abstract doCreateLogger(resource: URI, logLevel: LogLevel, options?: ILoggerOptions): ILogger;
 }
 
+// #region 用于测试相关的构造数据
 export class NullLogger implements ILogger {
 	readonly onDidChangeLogLevel: Event<LogLevel> = new Emitter<LogLevel>().event;
 	setLevel(level: LogLevel): void { }
@@ -611,6 +653,7 @@ export class NullLoggerService extends AbstractLoggerService {
 		return new NullLogger();
 	}
 }
+// #endregion
 
 export function getLogLevel(environmentService: IEnvironmentService): LogLevel {
 	if (environmentService.verbose) {
@@ -625,6 +668,7 @@ export function getLogLevel(environmentService: IEnvironmentService): LogLevel {
 	return DEFAULT_LOG_LEVEL;
 }
 
+// 日志级别的枚举值转换为字符串
 export function LogLevelToString(logLevel: LogLevel): string {
 	switch (logLevel) {
 		case LogLevel.Trace: return 'trace';
@@ -636,6 +680,7 @@ export function LogLevelToString(logLevel: LogLevel): string {
 	}
 }
 
+// 转换日志级别字符串为枚举值
 export function parseLogLevel(logLevel: string): LogLevel | undefined {
 	switch (logLevel) {
 		case 'trace':
