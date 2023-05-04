@@ -52,10 +52,14 @@ export class BufferLogService extends AbstractMessageLogger implements ILogServi
 		}
 	}
 
+	// 覆写dispose销毁逻辑
+	// 调用传入的日志器的dispose销毁逻辑
 	override dispose(): void {
 		this._logger?.dispose();
 	}
 
+	// 覆写flush逻辑
+	// 调用传入的日志器的flush逻辑
 	override flush(): void {
 		this._logger?.flush();
 	}

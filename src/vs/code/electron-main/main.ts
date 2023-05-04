@@ -124,6 +124,7 @@ class CodeMain {
 			// async accessor => {} 内部可以通过accessor获取所有的服务
 			// await 等待的是 async accessor => {} 的调用结果
 			await instantiationService.invokeFunction(async accessor => {
+				// 获取多级日志服务，主进程输出日志调用的是logService
 				const logService = accessor.get(ILogService);
 				const lifecycleMainService = accessor.get(ILifecycleMainService);
 				const fileService = accessor.get(IFileService);
@@ -141,8 +142,16 @@ class CodeMain {
 
 				// Delay creation of spdlog for perf reasons (https://github.com/microsoft/vscode/issues/72906)
 				// 考虑到性能问题，延迟创建spdlog进行日志输出
-				// loggerService.createLogger会初始化spdlog库作为日志器，
-				// 日志器赋值给bufferLogService.logger时，bufferLogService服务会立即输出或IO自身缓存的日志数据
+				// loggerService.createLogger会初始化spdlog库作为日志器，指定日志器后会立即IO输出bufferLogService缓存的日志数据
+				// 另外说明：
+				// - 主进程的日志服务是一个多级日志服务，第一个服务是主进程控制台日志输出服务，第二个服务是一个尚未指定日志器的BufferLog服务
+				// - 在此指定日志器之前，调用主进程的日志服务只会有主进程控制台日志服务进行输出，而BufferLog服务则会缓存日志数据
+				// - 直到下面直到logger之后会立即输出所有缓存的日志数据，
+				// - logger指定完成后，后续调用日志服务时BufferLog会立即输出日志
+				const a = bufferLogService;
+				console.log(111111);
+				console.log(a);
+
 				bufferLogService.logger = loggerService.createLogger(URI.file(join(environmentMainService.logsPath, 'main.log')), { name: 'main' });
 
 				// Lifecycle

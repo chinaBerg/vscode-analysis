@@ -549,7 +549,8 @@ interface ILoggerItem {
 }
 
 /**
- * LoggerService的抽象类
+ * 日志服务的抽象基类
+ * 子类必须重写用于创建日志器的抽象方法doCreateLogger
  */
 export abstract class AbstractLoggerService extends Disposable implements ILoggerService {
 
