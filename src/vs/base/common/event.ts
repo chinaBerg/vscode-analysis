@@ -28,6 +28,8 @@ const _enableSnapshotPotentialLeakWarning = false;
 
 /**
  * An event with zero or one parameters that can be subscribed to. The event is a function itself.
+ * 只有一个或零个参数的可订阅事件
+ * 事件本身是一个函数
  */
 export interface Event<T> {
 	(listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[] | DisposableStore): IDisposable;
@@ -678,16 +680,22 @@ class Stacktrace {
 	}
 }
 
+/**
+ * Emitter的侦听器
+ */
 class Listener<T> {
 
 	readonly subscription = new SafeDisposable();
 
+	// callback 侦听事件触发后的回调函数
+	// callbackThis 指定回调函数的作用域
 	constructor(
 		readonly callback: (e: T) => void,
 		readonly callbackThis: any | undefined,
 		readonly stack: Stacktrace | undefined
 	) { }
 
+	// 借助invoke方法执行事件的回调函数并绑定作用域
 	invoke(e: T) {
 		this.callback.call(this.callbackThis, e);
 	}
@@ -714,6 +722,9 @@ class Listener<T> {
 		}
 	}
  */
+// Emitter
+// 能够从内部向公众发射一个事件
+// 该Emitter的实现不需要派发/订阅事件名称
 export class Emitter<T> {
 
 	private readonly _options?: EmitterOptions;
@@ -784,6 +795,7 @@ export class Emitter<T> {
 
 				const firstListener = this._listeners.isEmpty();
 
+				// 准备添加第一个侦听器时，触发onWillAddFirstListener钩子
 				if (firstListener && this._options?.onWillAddFirstListener) {
 					this._options.onWillAddFirstListener(this);
 				}
@@ -801,12 +813,16 @@ export class Emitter<T> {
 				}
 
 				const listener = new Listener(callback, thisArgs, stack);
+				// 添加侦听器
+				// removeListener 方法可以从链表中移除侦听器
 				const removeListener = this._listeners.push(listener);
 
+				// 添加第一个侦听器完成后，触发onDidAddFirstListener钩子
 				if (firstListener && this._options?.onDidAddFirstListener) {
 					this._options.onDidAddFirstListener(this);
 				}
 
+				// 添加侦听器后，触发onDidAddListener钩子
 				if (this._options?.onDidAddListener) {
 					this._options.onDidAddListener(this, callback, thisArgs);
 				}
@@ -814,7 +830,9 @@ export class Emitter<T> {
 				const result = listener.subscription.set(() => {
 					removeMonitor?.();
 					if (!this._disposed) {
+						// 移除侦听器
 						removeListener();
+						// 移除最后一个侦听器后，触发onDidRemoveLastListener钩子
 						if (this._options && this._options.onDidRemoveLastListener) {
 							const hasListeners = (this._listeners && !this._listeners.isEmpty());
 							if (!hasListeners) {

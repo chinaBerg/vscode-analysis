@@ -148,10 +148,6 @@ class CodeMain {
 				// - 在此指定日志器之前，调用主进程的日志服务只会有主进程控制台日志服务进行输出，而BufferLog服务则会缓存日志数据
 				// - 直到下面直到logger之后会立即输出所有缓存的日志数据，
 				// - logger指定完成后，后续调用日志服务时BufferLog会立即输出日志
-				const a = bufferLogService;
-				console.log(111111);
-				console.log(a);
-
 				bufferLogService.logger = loggerService.createLogger(URI.file(join(environmentMainService.logsPath, 'main.log')), { name: 'main' });
 
 				// Lifecycle
@@ -196,9 +192,10 @@ class CodeMain {
 		// 初始化后的bufferLogService服务，在设置bufferLogService.logger之前，日志都存在缓存区
 		// 设置bufferLogService.logger之后，会立即消费缓存区日志数据进行输出
 		const bufferLogService = new BufferLogService();
-		// 创建多级日志
+		// 创建多重日志服务
 		// 传递给MultiplexLogService的所有日志服务都会依次进行输出
 		const logService = disposables.add(new MultiplexLogService([new ConsoleMainLogger(getLogLevel(environmentMainService)), bufferLogService]));
+		// 注册多重日志服务
 		services.set(ILogService, logService);
 
 		// Files
@@ -212,6 +209,7 @@ class CodeMain {
 		services.set(IUriIdentityService, uriIdentityService);
 
 		// Logger
+		// 注册主进程文件日志服务（将日志输出到文件系统）
 		services.set(ILoggerService, new LoggerService(logService));
 
 		// State
