@@ -213,6 +213,7 @@ class CodeMain {
 		services.set(ILoggerService, new LoggerService(logService));
 
 		// State
+		// 应用状态服务
 		const stateMainService = new StateMainService(environmentMainService, logService, fileService);
 		services.set(IStateMainService, stateMainService);
 
@@ -275,6 +276,7 @@ class CodeMain {
 		await Promises.settled<unknown>([
 
 			// Environment service (paths)
+			// 确保环境服务中的各个文件夹存在，不存在则创建
 			Promise.all<string | undefined>([
 				environmentMainService.extensionsPath,
 				environmentMainService.codeCachePath,
@@ -286,6 +288,7 @@ class CodeMain {
 			].map(path => path ? FSPromises.mkdir(path, { recursive: true }) : undefined)),
 
 			// State service
+			// 初始化应用状态服务
 			stateMainService.init(),
 
 			// Configuration service

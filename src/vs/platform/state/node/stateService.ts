@@ -14,8 +14,10 @@ import { IStateService } from 'vs/platform/state/node/state';
 
 type StorageDatabase = { [key: string]: unknown };
 
+// 文件存储
 export class FileStorage {
 
+	// 存储数据库
 	private storage: StorageDatabase = Object.create(null);
 	private lastSavedStorageContents = '';
 
@@ -25,22 +27,28 @@ export class FileStorage {
 	private closing: Promise<void> | undefined = undefined;
 
 	constructor(
+		// 数据存储库写入的文件地址
 		private readonly storagePath: URI,
+		// 日志服务
 		private readonly logService: ILogService,
+		// 文件服务
 		private readonly fileService: IFileService
 	) {
 	}
 
 	init(): Promise<void> {
+		// 避免重复初始化
 		if (!this.initializing) {
 			this.initializing = this.doInit();
 		}
-
+		// 返回初始化结果
 		return this.initializing;
 	}
 
+	// 初始化逻辑
 	private async doInit(): Promise<void> {
 		try {
+			// 读取"{appdata}/code-oss-dev/User/globalStorage/storage.json"配置
 			this.lastSavedStorageContents = (await this.fileService.readFile(this.storagePath)).value.toString();
 			this.storage = JSON.parse(this.lastSavedStorageContents);
 		} catch (error) {
@@ -50,6 +58,7 @@ export class FileStorage {
 		}
 	}
 
+	// 获取数据库字段的值
 	getItem<T>(key: string, defaultValue: T): T;
 	getItem<T>(key: string, defaultValue?: T): T | undefined;
 	getItem<T>(key: string, defaultValue?: T): T | undefined {
@@ -71,6 +80,7 @@ export class FileStorage {
 		for (const { key, data } of items) {
 
 			// Shortcut for data that did not change
+			// 数据未变化不更新数据库
 			if (this.storage[key] === data) {
 				continue;
 			}
@@ -90,7 +100,9 @@ export class FileStorage {
 			}
 		}
 
+		// save用于控制只新增值为undefined的key时，不立即写入
 		if (save) {
+			// 调用save方法更新到磁盘
 			this.save();
 		}
 	}
@@ -118,9 +130,11 @@ export class FileStorage {
 		}
 
 		// Make sure to wait for init to finish first
+		// 确保初始化完成
 		await this.initializing;
 
 		// Return early if the database has not changed
+		// 数据库内容未变化，不写入，尽量减少IO次数
 		const serializedDatabase = JSON.stringify(this.storage, null, 4);
 		if (serializedDatabase === this.lastSavedStorageContents) {
 			return;
@@ -128,7 +142,9 @@ export class FileStorage {
 
 		// Write to disk
 		try {
+			// 调用文件服务写入磁盘
 			await this.fileService.writeFile(this.storagePath, VSBuffer.fromString(serializedDatabase));
+			// 记录最后一次写入数据，用于下次是存在数据库更新的判断
 			this.lastSavedStorageContents = serializedDatabase;
 		} catch (error) {
 			this.logService.error(error);
@@ -144,6 +160,7 @@ export class FileStorage {
 	}
 }
 
+// 应用状态服务
 export class StateService implements IStateService {
 
 	declare readonly _serviceBrand: undefined;
@@ -155,6 +172,7 @@ export class StateService implements IStateService {
 		@ILogService logService: ILogService,
 		@IFileService fileService: IFileService
 	) {
+		// 初始化文件存储数据库
 		this.fileStorage = new FileStorage(environmentService.stateResource, logService, fileService);
 	}
 

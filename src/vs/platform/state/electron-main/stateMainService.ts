@@ -6,6 +6,11 @@
 import { IStateMainService } from 'vs/platform/state/electron-main/state';
 import { StateService } from 'vs/platform/state/node/stateService';
 
+/**
+ * 主进程应用状态服务
+ * 继承自StateService服务，主要功能由StateService实现
+ * 重新实现了移除新增状态等方法
+ */
 export class StateMainService extends StateService implements IStateMainService {
 
 	declare readonly _serviceBrand: undefined;
