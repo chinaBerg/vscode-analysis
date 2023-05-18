@@ -77,13 +77,17 @@ export namespace Event {
 	 * Given an event, returns another event which only fires once.
 	 *
 	 * @param event The event source for the new event.
+	 * 只监听一次事件触发
 	 */
 	export function once<T>(event: Event<T>): Event<T> {
+		// 返回一个只侦听一次触发的事件
 		return (listener, thisArgs = null, disposables?) => {
 			// we need this, in case the event fires during the listener call
 			let didFire = false;
 			let result: IDisposable | undefined = undefined;
+			// 给原事件绑定回调函数
 			result = event(e => {
+				// 控制仅触发一次
 				if (didFire) {
 					return;
 				} else if (result) {
@@ -92,6 +96,7 @@ export namespace Event {
 					didFire = true;
 				}
 
+				// 执行回调、填入参数，并绑定作用域
 				return listener.call(thisArgs, e);
 			}, null, disposables);
 
