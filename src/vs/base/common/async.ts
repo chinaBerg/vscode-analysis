@@ -588,16 +588,22 @@ export interface ILimiter<T> {
 /**
  * A helper to queue N promises and run them all with a max degree of parallelism. The helper
  * ensures that at any time no more than M promises are running at the same time.
+ * 限制最大并发数的异步队列
  */
 export class Limiter<T> implements ILimiter<T>{
 
+	// 任务队列长度大小
 	private _size = 0;
+	// 正在执行的任务数量
 	private runningPromises: number;
+	// 最大并发数
 	private readonly maxDegreeOfParalellism: number;
+	// 存放任务的队列
 	private readonly outstandingPromises: ILimitedTaskFactory<T>[];
 	private readonly _onDrained: Emitter<void>;
 
 	constructor(maxDegreeOfParalellism: number) {
+		// 初始化工作
 		this.maxDegreeOfParalellism = maxDegreeOfParalellism;
 		this.outstandingPromises = [];
 		this.runningPromises = 0;
@@ -611,6 +617,8 @@ export class Limiter<T> implements ILimiter<T>{
 	 *
 	 * This is NOT an event that signals when all promises
 	 * have finished though.
+	 *
+	 * 所有任务均已开始调度消费的事件，不是所有任务都已经执行完成的事件
 	 */
 	get onDrained(): Event<void> {
 		return this._onDrained.event;
@@ -620,22 +628,31 @@ export class Limiter<T> implements ILimiter<T>{
 		return this._size;
 	}
 
+	// 添加一个任务到任务队列，并立即开始队列的执行
+	// 任务的执行结果会作为返回的Promise结果
 	queue(factory: ITask<Promise<T>>): Promise<T> {
 		this._size++;
 
 		return new Promise<T>((c, e) => {
 			this.outstandingPromises.push({ factory, c, e });
+			// 立即消费队列
 			this.consume();
 		});
 	}
 
+	// 任务队列消费
 	private consume(): void {
+		// while循环控制最大并发数
 		while (this.outstandingPromises.length && this.runningPromises < this.maxDegreeOfParalellism) {
 			const iLimitedTask = this.outstandingPromises.shift()!;
+			// 正在执行的任务数量加1
 			this.runningPromises++;
 
+			// 执行异步任务
 			const promise = iLimitedTask.factory();
+			// 异步任务执行成功或失败，响应调用queue方法的promise结果
 			promise.then(iLimitedTask.c, iLimitedTask.e);
+			// 此次消费结束后的处理逻辑：全部结束或者下个任务
 			promise.then(() => this.consumed(), () => this.consumed());
 		}
 	}
@@ -644,9 +661,12 @@ export class Limiter<T> implements ILimiter<T>{
 		this._size--;
 		this.runningPromises--;
 
+		// 任务队列未全部消费，继续消费，拉满最大并发数
 		if (this.outstandingPromises.length > 0) {
 			this.consume();
 		} else {
+			// 所有任务已消费，触发onDrained回调
+			// 此时，是所有任务已经执行，并不是所有任务都已经执行完成
 			this._onDrained.fire();
 		}
 	}
@@ -658,6 +678,7 @@ export class Limiter<T> implements ILimiter<T>{
 
 /**
  * A queue is handles one promise at a time and guarantees that at any time only one promise is executing.
+ * 最大并发为1的异步执行队列
  */
 export class Queue<T> extends Limiter<T> {
 
@@ -669,9 +690,11 @@ export class Queue<T> extends Limiter<T> {
 /**
  * A helper to organize queues per resource. The ResourceQueue makes sure to manage queues per resource
  * by disposing them once the queue is empty.
+ * 资源队列
  */
 export class ResourceQueue implements IDisposable {
 
+	// 队列表
 	private readonly queues = new Map<string, Queue<void>>();
 
 	private readonly drainers = new Set<DeferredPromise<void>>();
@@ -700,18 +723,25 @@ export class ResourceQueue implements IDisposable {
 	queueFor(resource: URI, extUri: IExtUri = defaultExtUri): ILimiter<void> {
 		const key = extUri.getComparisonKey(resource);
 
+		// 根据key获取队列
 		let queue = this.queues.get(key);
+		// 队列不存在则创建
 		if (!queue) {
 			queue = new Queue<void>();
+			// 监听一次队列的onDrained事件
+			// 事件触发后，清空并dispose队列
 			Event.once(queue.onDrained)(() => {
 				queue?.dispose();
 				this.queues.delete(key);
+				// 触发一次队列的onDidQueueDrain钩子
 				this.onDidQueueDrain();
 			});
 
+			// 往队列表中插入新创建的队列
 			this.queues.set(key, queue);
 		}
 
+		// 返回队列
 		return queue;
 	}
 
