@@ -156,6 +156,7 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 
 	private readonly resourceLocks = new ResourceMap<Barrier>(resource => extUriBiasedIgnorePathCase.getComparisonKey(resource));
 
+	// 创建资源锁
 	private async createResourceLock(resource: URI): Promise<IDisposable> {
 		const filePath = this.toFilePath(resource);
 		this.traceLock(`[Disk FileSystemProvider]: createResourceLock() - request to acquire resource lock (${filePath})`);
@@ -164,12 +165,15 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 		// added right after opening, so we have to loop over locks until no lock
 		// remains.
 		let existingLock: Barrier | undefined = undefined;
+		// 尝试获取文件锁，
+		// 如果文件锁已存在，则等待文件锁的释放
 		while (existingLock = this.resourceLocks.get(resource)) {
 			this.traceLock(`[Disk FileSystemProvider]: createResourceLock() - waiting for resource lock to be released (${filePath})`);
 			await existingLock.wait();
 		}
 
 		// Store new
+		// 创建新的文件锁添加到资源锁映射表中
 		const newLock = new Barrier();
 		this.resourceLocks.set(resource, newLock);
 
@@ -179,17 +183,24 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 			this.traceLock(`[Disk FileSystemProvider]: createResourceLock() - resource lock dispose() (${filePath})`);
 
 			// Delete lock if it is still ours
+			// 从资源锁映射表中移除
 			if (this.resourceLocks.get(resource) === newLock) {
 				this.traceLock(`[Disk FileSystemProvider]: createResourceLock() - resource lock removed from resource-lock map (${filePath})`);
 				this.resourceLocks.delete(resource);
 			}
 
 			// Open lock
+			// 释放锁
 			this.traceLock(`[Disk FileSystemProvider]: createResourceLock() - resource lock barrier open() (${filePath})`);
 			newLock.open();
 		});
 	}
 
+	/**
+	 * 读取文件
+	 * @param resource 资源URI
+	 * @param options.atomic 原子读取
+	 */
 	async readFile(resource: URI, options?: IFileAtomicReadOptions): Promise<Uint8Array> {
 		let lock: IDisposable | undefined = undefined;
 		try {
@@ -199,15 +210,18 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 				// When the read should be atomic, make sure
 				// to await any pending locks for the resource
 				// and lock for the duration of the read.
+				// 原子读取时，创建资源锁
 				lock = await this.createResourceLock(resource);
 			}
 
 			const filePath = this.toFilePath(resource);
 
+			// 读取文件
 			return await Promises.readFile(filePath);
 		} catch (error) {
 			throw this.toFileSystemProviderError(error);
 		} finally {
+			// 读取完成释放原子读取的资源锁
 			lock?.dispose();
 		}
 	}

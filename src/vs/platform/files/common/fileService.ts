@@ -22,6 +22,9 @@ import { ensureFileSystemProviderError, etag, ETAG_DISABLED, FileChangesEvent, I
 import { readFileIntoStream } from 'vs/platform/files/common/io';
 import { ILogService } from 'vs/platform/log/common/log';
 
+/**
+ * 文件服务
+ */
 export class FileService extends Disposable implements IFileService {
 
 	declare readonly _serviceBrand: undefined;
@@ -37,6 +40,7 @@ export class FileService extends Disposable implements IFileService {
 
 	//#region File System Provider
 
+	// 监听文件系统注册发生变化的触发器
 	private readonly _onDidChangeFileSystemProviderRegistrations = this._register(new Emitter<IFileSystemProviderRegistrationEvent>());
 	readonly onDidChangeFileSystemProviderRegistrations = this._onDidChangeFileSystemProviderRegistrations.event;
 
@@ -48,7 +52,9 @@ export class FileService extends Disposable implements IFileService {
 
 	private readonly provider = new Map<string, IFileSystemProvider>();
 
+	// 注册文件服务Provider
 	registerProvider(scheme: string, provider: IFileSystemProvider): IDisposable {
+		// 避免重复注册Provider
 		if (this.provider.has(scheme)) {
 			throw new Error(`A filesystem provider for the scheme '${scheme}' is already registered.`);
 		}
@@ -58,6 +64,7 @@ export class FileService extends Disposable implements IFileService {
 		const providerDisposables = new DisposableStore();
 
 		// Add provider with event
+		// 注册文件服务Provider，并触发一个新增Provider事件
 		this.provider.set(scheme, provider);
 		this._onDidChangeFileSystemProviderRegistrations.fire({ added: true, scheme, provider });
 
@@ -76,6 +83,7 @@ export class FileService extends Disposable implements IFileService {
 		});
 	}
 
+	// 根据schema获取文件服务Provider
 	getProvider(scheme: string): IFileSystemProvider | undefined {
 		return this.provider.get(scheme);
 	}
@@ -469,10 +477,15 @@ export class FileService extends Disposable implements IFileService {
 		return this.doReadFile(provider, resource, options, token);
 	}
 
+	// 实现原子读取的辅助方法
 	private async doReadFileAtomic(provider: IFileSystemProviderWithFileReadWriteCapability | IFileSystemProviderWithOpenReadWriteCloseCapability | IFileSystemProviderWithFileReadStreamCapability, resource: URI, options?: IReadFileOptions, token?: CancellationToken): Promise<IFileContent> {
 		return new Promise<IFileContent>((resolve, reject) => {
+			// 异步串行队列执行读取操作，
+			// 原子读取模式，所有的读取操作都进入队列排队，
+			// 确保同一时间仅有一个文件在读取
 			this.writeQueue.queueFor(resource, this.getExtUri(provider).providerExtUri).queue(async () => {
 				try {
+					// 文件读取逻辑
 					const content = await this.doReadFile(provider, resource, options, token);
 					resolve(content);
 				} catch (error) {

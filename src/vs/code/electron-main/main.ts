@@ -199,8 +199,10 @@ class CodeMain {
 		services.set(ILogService, logService);
 
 		// Files
+		// 文件服务
 		const fileService = new FileService(logService);
 		services.set(IFileService, fileService);
+		// 向文件服务注册Provider
 		const diskFileSystemProvider = new DiskFileSystemProvider(logService);
 		fileService.registerProvider(Schemas.file, diskFileSystemProvider);
 
