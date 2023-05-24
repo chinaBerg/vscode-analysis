@@ -96,8 +96,10 @@ export class LinkedList<E> {
 		// 更新链表节点数量
 		this._size += 1;
 
+		// 返回一个用于删除新建节点的函数
 		let didRemove = false;
 		return () => {
+			// 防止重复删除
 			if (!didRemove) {
 				didRemove = true;
 				this._remove(newNode);
@@ -154,7 +156,8 @@ export class LinkedList<E> {
 		this._size -= 1;
 	}
 
-	// 支持迭代器
+	// 实现可迭代协议
+	// 用于支持for/of循环
 	*[Symbol.iterator](): Iterator<E> {
 		let node = this._first;
 		while (node !== Node.Undefined) {
