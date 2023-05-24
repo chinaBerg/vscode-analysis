@@ -454,13 +454,18 @@ export class FileService extends Disposable implements IFileService {
 		return stat;
 	}
 
+	/**
+	 * 读取文件
+	 */
 	async readFile(resource: URI, options?: IReadFileOptions, token?: CancellationToken): Promise<IFileContent> {
 		const provider = await this.withReadProvider(resource);
 
+		// 支持原子读取
 		if (options?.atomic) {
 			return this.doReadFileAtomic(provider, resource, options, token);
 		}
 
+		// 非原子读取
 		return this.doReadFile(provider, resource, options, token);
 	}
 
@@ -1122,6 +1127,7 @@ export class FileService extends Disposable implements IFileService {
 
 	//#region Helpers
 
+	// 资源队列
 	private readonly writeQueue = this._register(new ResourceQueue());
 
 	private async doWriteBuffered(provider: IFileSystemProviderWithOpenReadWriteCloseCapability, resource: URI, options: IWriteFileOptions | undefined, readableOrStreamOrBufferedStream: VSBufferReadable | VSBufferReadableStream | VSBufferReadableBufferedStream): Promise<void> {
