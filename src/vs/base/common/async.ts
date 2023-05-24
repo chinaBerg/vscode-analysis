@@ -407,6 +407,7 @@ export class ThrottledDelayer<T> {
 
 /**
  * A barrier that is initially closed and then becomes opened permanently.
+ * 一个初始化是关闭，开启后就永久不会关闭的屏障
  */
 export class Barrier {
 
@@ -415,21 +416,29 @@ export class Barrier {
 	private _completePromise!: (v: boolean) => void;
 
 	constructor() {
+		// 屏障初始状态
 		this._isOpen = false;
+		// 立即初始化一个Promise，并且缓存住resolve逻辑
+		// 只有调用_completePromise才resolve
 		this._promise = new Promise<boolean>((c, e) => {
 			this._completePromise = c;
 		});
 	}
 
+	// 屏障是否开启
 	isOpen(): boolean {
 		return this._isOpen;
 	}
 
+	// 开启屏障
+	// 调用_completePromise来resolve Pormise
+	// resolve后，wait函数才能await到结果
 	open(): void {
 		this._isOpen = true;
 		this._completePromise(true);
 	}
 
+	// 等待屏障开启成功
 	wait(): Promise<boolean> {
 		return this._promise;
 	}
