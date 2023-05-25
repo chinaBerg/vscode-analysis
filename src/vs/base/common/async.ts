@@ -258,6 +258,7 @@ interface IScheduledLater extends IDisposable {
 	isTriggered(): boolean;
 }
 
+// 拥有IDisposable接口的延迟定时器
 const timeoutDeferred = (timeout: number, fn: () => void): IScheduledLater => {
 	let scheduled = true;
 	const handle = setTimeout(() => {
@@ -273,6 +274,7 @@ const timeoutDeferred = (timeout: number, fn: () => void): IScheduledLater => {
 	};
 };
 
+// 拥有IDisposable接口的queueMicrotask延迟
 const microtaskDeferred = (fn: () => void): IScheduledLater => {
 	let scheduled = true;
 	queueMicrotask(() => {
@@ -313,6 +315,9 @@ export const MicrotaskDelay = Symbol('MicrotaskDelay');
  * 			letters.push(l);
  * 			delayer.trigger(() => { return makeTheTrip(); });
  * 		}
+ *
+ * 延迟防抖函数
+ * 延迟一段时间之后执行，在延迟期间重复调用则重新初始化延迟时间并取消前一次的调用
  */
 export class Delayer<T> implements IDisposable {
 
@@ -322,6 +327,7 @@ export class Delayer<T> implements IDisposable {
 	private doReject: ((err: any) => void) | null;
 	private task: ITask<T | Promise<T>> | null;
 
+	// 支持宏任务和微任务延迟调用防抖
 	constructor(public defaultDelay: number | typeof MicrotaskDelay) {
 		this.deferred = null;
 		this.completionPromise = null;
@@ -332,15 +338,21 @@ export class Delayer<T> implements IDisposable {
 
 	trigger(task: ITask<T | Promise<T>>, delay = this.defaultDelay): Promise<T> {
 		this.task = task;
+		// 尝试取消上一次的调用
+		// 用于实现防抖效果
 		this.cancelTimeout();
 
 		if (!this.completionPromise) {
+			// 缓存resolve和reject的引用
+			// 等调用doResolve时会执行then的逻辑
 			this.completionPromise = new Promise((resolve, reject) => {
 				this.doResolve = resolve;
 				this.doReject = reject;
 			}).then(() => {
+				// 重置状态
 				this.completionPromise = null;
 				this.doResolve = null;
+				// 执行回调
 				if (this.task) {
 					const task = this.task;
 					this.task = null;
@@ -350,20 +362,24 @@ export class Delayer<T> implements IDisposable {
 			});
 		}
 
+		// 延迟时间后的回调函数
 		const fn = () => {
 			this.deferred = null;
 			this.doResolve?.(null);
 		};
 
+		// 判断走宏任务延迟调用还是微任务延迟调用
 		this.deferred = delay === MicrotaskDelay ? microtaskDeferred(fn) : timeoutDeferred(delay, fn);
 
 		return this.completionPromise;
 	}
 
+	// 判断调用是否执行完毕
 	isTriggered(): boolean {
 		return !!this.deferred?.isTriggered();
 	}
 
+	// 取消
 	cancel(): void {
 		this.cancelTimeout();
 
@@ -373,6 +389,7 @@ export class Delayer<T> implements IDisposable {
 		}
 	}
 
+	// 取消延迟调用
 	private cancelTimeout(): void {
 		this.deferred?.dispose();
 		this.deferred = null;
@@ -461,6 +478,7 @@ export class Barrier {
 /**
  * A barrier that is initially closed and then becomes opened permanently after a certain period of
  * time or when open is called explicitly
+ * 初始是关闭的但在一段时间后自动打开（或调用open后）便永久打开的屏障
  */
 export class AutoOpenBarrier extends Barrier {
 
