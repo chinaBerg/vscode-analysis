@@ -161,6 +161,10 @@ export interface ITask<T> {
  * 			letters.push(l);
  * 			throttler.queue(deliver);
  * 		}
+ * 异步节流函数，防止异步任务堆积
+ * - 调用后立即执行第一个异步函数，在第一个异步执行期间内的多次调用都将排队等待
+ * - 第一个异步执行完毕后，执行一次在此期间排期的异步（无论排队多少，都将执行最后一次）
+ * - 如果继续调用，重复上述逻辑
  */
 export class Throttler {
 
@@ -169,15 +173,21 @@ export class Throttler {
 	private queuedPromiseFactory: ITask<Promise<any>> | null;
 
 	constructor() {
+		// 正在执行的任务
 		this.activePromise = null;
+		// 正在排队的任务
 		this.queuedPromise = null;
+		// 最新的任务
 		this.queuedPromiseFactory = null;
 	}
 
 	queue<T>(promiseFactory: ITask<Promise<T>>): Promise<T> {
+		// 调用时存在执行执行的异步任务
 		if (this.activePromise) {
+			// 记录最新的异步任务（此次需要执行的任务）
 			this.queuedPromiseFactory = promiseFactory;
 
+			// 尚未有排队任务
 			if (!this.queuedPromise) {
 				const onComplete = () => {
 					this.queuedPromise = null;
@@ -188,19 +198,23 @@ export class Throttler {
 					return result;
 				};
 
+				// 排队的任务需要等待正在执行的异步任务结束
 				this.queuedPromise = new Promise(resolve => {
 					this.activePromise!.then(onComplete, onComplete).then(resolve);
 				});
 			}
 
+			// 已经有任务正在排队，加入等待
 			return new Promise((resolve, reject) => {
 				this.queuedPromise!.then(resolve, reject);
 			});
 		}
 
+		// 调用时没有正在执行的异步，直接执行当前异步任务
 		this.activePromise = promiseFactory();
 
 		return new Promise((resolve, reject) => {
+			// 当前异步任务执行完毕后重置状态为没有正在执行的任务
 			this.activePromise!.then((result: T) => {
 				this.activePromise = null;
 				resolve(result);
