@@ -252,10 +252,12 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 			if (!opts.create || !opts.overwrite) {
 				const fileExists = await Promises.exists(filePath);
 				if (fileExists) {
+					// 文件已存在，但是不允许覆盖，则抛出文件已存在的错误
 					if (!opts.overwrite) {
 						throw createFileSystemProviderError(localize('fileExists', "File already exists"), FileSystemProviderErrorCode.FileExists);
 					}
 				} else {
+					// 文件不存在，但是不允许创建，则抛出文件不存在的错误
 					if (!opts.create) {
 						throw createFileSystemProviderError(localize('fileNotExists', "File does not exist"), FileSystemProviderErrorCode.FileNotFound);
 					}
@@ -263,13 +265,16 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 			}
 
 			// Open
+			// 打开文件
 			handle = await this.open(resource, { create: true, unlock: opts.unlock });
 
 			// Write content at once
+			// 写入文件
 			await this.write(handle, 0, content, 0, content.byteLength);
 		} catch (error) {
 			throw await this.toFileSystemProviderWriteError(resource, error);
 		} finally {
+			// 写入完成后关闭文件
 			if (typeof handle === 'number') {
 				await this.close(handle);
 			}
@@ -521,6 +526,7 @@ export class DiskFileSystemProvider extends AbstractDiskFileSystemProvider imple
 		// We know at this point that the file to write to is truncated and thus empty
 		// if the write now fails, the file remains empty. as such we really try hard
 		// to ensure the write succeeds by retrying up to three times.
+		// 三次写入尝试
 		return retry(() => this.doWrite(fd, pos, data, offset, length), 100 /* ms delay */, 3 /* retries */);
 	}
 
