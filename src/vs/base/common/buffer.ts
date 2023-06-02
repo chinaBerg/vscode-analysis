@@ -43,15 +43,22 @@ export class VSBuffer {
 	/**
 	 * When running in a nodejs context, the backing store for the returned `VSBuffer` instance
 	 * might use a nodejs Buffer allocated from node's Buffer pool, which is not transferrable.
+	 * 将字符串转换成VsBuffer格式
+	 * - 支持Node的Buffer方式转换
+	 * - 支持TextEncoder方式转换
 	 */
 	static fromString(source: string, options?: { dontUseNodeBuffer?: boolean }): VSBuffer {
 		const dontUseNodeBuffer = options?.dontUseNodeBuffer || false;
+		// 使用NodeJs的Buffer.from转换buffer，
+		// 在没有明确禁用NodeJs并且支持NodeJsBuffer的情况下
 		if (!dontUseNodeBuffer && hasBuffer) {
 			return new VSBuffer(Buffer.from(source));
 		} else {
+			// 确保已创建TextEncoder实例
 			if (!textEncoder) {
 				textEncoder = new TextEncoder();
 			}
+			// 通过TextEncoder编码成buffer格式
 			return new VSBuffer(textEncoder.encode(source));
 		}
 	}
@@ -94,7 +101,9 @@ export class VSBuffer {
 	readonly buffer: Uint8Array;
 	readonly byteLength: number;
 
+	// NodeJs的Buffer类是JS的Unit8Array的子类
 	private constructor(buffer: Uint8Array) {
+		// VSBuffer实例用于buffer和byteLength属性
 		this.buffer = buffer;
 		this.byteLength = this.buffer.byteLength;
 	}
