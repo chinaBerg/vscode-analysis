@@ -17,9 +17,12 @@ export class VSBuffer {
 	/**
 	 * When running in a nodejs context, the backing store for the returned `VSBuffer` instance
 	 * might use a nodejs Buffer allocated from node's Buffer pool, which is not transferrable.
+	 * 生成指定字节长度的buffer，
+	 * 根据环境判断生成NodeJs的Buffer或者非NodeJS环境的ArrayBuffer
 	 */
 	static alloc(byteLength: number): VSBuffer {
 		if (hasBuffer) {
+			// Buffer.allocUnsafe 比 Buffer.alloc 拥有额外的性能提升
 			return new VSBuffer(Buffer.allocUnsafe(byteLength));
 		} else {
 			return new VSBuffer(new Uint8Array(byteLength));
@@ -118,6 +121,11 @@ export class VSBuffer {
 		return result;
 	}
 
+	/**
+	 * 实现toString方法，
+	 * 将buffer转换成string
+	 * @returns
+	 */
 	toString(): string {
 		if (hasBuffer) {
 			return this.buffer.toString();
