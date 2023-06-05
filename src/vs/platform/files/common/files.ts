@@ -443,21 +443,27 @@ export const enum FileSystemProviderCapabilities {
 
 	/**
 	 * Provider supports unbuffered read/write.
+	 * 结果是2，效果是2的1次方
+	 * 左移位运算，左移1位，空出补0
 	 */
 	FileReadWrite = 1 << 1,
 
 	/**
 	 * Provider supports open/read/write/close low level file operations.
+	 * 结果是4，效果是2的2次方
+	 * 左移位运算，左移2位，空出补0
 	 */
 	FileOpenReadWriteClose = 1 << 2,
 
 	/**
 	 * Provider supports stream based reading.
+	 * 结果是16，效果是2的4次方
 	 */
 	FileReadStream = 1 << 4,
 
 	/**
 	 * Provider supports copy operation.
+	 * 结果是8，效果是2的3次方
 	 */
 	FileFolderCopy = 1 << 3,
 
@@ -528,7 +534,22 @@ export interface IFileSystemProviderWithFileReadWriteCapability extends IFileSys
 	writeFile(resource: URI, content: Uint8Array, opts: IFileWriteOptions): Promise<void>;
 }
 
+/**
+ * 判断目标provider是否拥有文件读写能力
+ */
 export function hasReadWriteCapability(provider: IFileSystemProvider): provider is IFileSystemProviderWithFileReadWriteCapability {
+	/**
+	 * 利用“与”位运算判断 provider.capabilities === FileSystemProviderCapabilities.FileReadWrite,
+	 * 实现原理在于 FileSystemProviderCapabilities 定义的枚举值为2,4,8,16,32,64... 递增的一直都是2的N次方，二进制值是:
+		2:         10
+		4:        100
+		8:       1000
+		16:     10000
+		32:    100000
+	 * &位运算逐位进行比对，两的位都为1时结果是1，否则为0，
+	 * 所以上述枚举值的&结果就是，只有两个数相等时才为1，否则都为0。
+	 * 例如, 2 & 4的结果是10和100比对，比对结果是000，对应十进制就是0
+	 */
 	return !!(provider.capabilities & FileSystemProviderCapabilities.FileReadWrite);
 }
 
@@ -555,6 +576,9 @@ export interface IFileSystemProviderWithOpenReadWriteCloseCapability extends IFi
 	write(fd: number, pos: number, data: Uint8Array, offset: number, length: number): Promise<number>;
 }
 
+/**
+ * 判断provider使用用于open/read/write/close等低级的文件操作能力
+ */
 export function hasOpenReadWriteCloseCapability(provider: IFileSystemProvider): provider is IFileSystemProviderWithOpenReadWriteCloseCapability {
 	return !!(provider.capabilities & FileSystemProviderCapabilities.FileOpenReadWriteClose);
 }
@@ -563,6 +587,9 @@ export interface IFileSystemProviderWithFileReadStreamCapability extends IFileSy
 	readFileStream(resource: URI, opts: IFileReadStreamOptions, token: CancellationToken): ReadableStreamEvents<Uint8Array>;
 }
 
+/**
+ * 判断目标provider是否用于流式读取文件能力
+ */
 export function hasFileReadStreamCapability(provider: IFileSystemProvider): provider is IFileSystemProviderWithFileReadStreamCapability {
 	return !!(provider.capabilities & FileSystemProviderCapabilities.FileReadStream);
 }

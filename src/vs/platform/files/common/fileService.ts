@@ -131,6 +131,7 @@ export class FileService extends Disposable implements IFileService {
 		return Iterable.map(this.provider, ([scheme, provider]) => ({ scheme, capabilities: provider.capabilities }));
 	}
 
+	// 根据URI获取provider
 	protected async withProvider(resource: URI): Promise<IFileSystemProvider> {
 
 		// Assert path is absolute
@@ -143,6 +144,7 @@ export class FileService extends Disposable implements IFileService {
 
 		// Assert provider
 		const provider = this.provider.get(resource.scheme);
+		// provider不存在抛错
 		if (!provider) {
 			const error = new Error();
 			error.name = 'ENOPRO';
@@ -154,13 +156,17 @@ export class FileService extends Disposable implements IFileService {
 		return provider;
 	}
 
+	// 使用读取模式的Provider
 	private async withReadProvider(resource: URI): Promise<IFileSystemProviderWithFileReadWriteCapability | IFileSystemProviderWithOpenReadWriteCloseCapability | IFileSystemProviderWithFileReadStreamCapability> {
+		// 获取Provider引用
 		const provider = await this.withProvider(resource);
 
+		// 判断provider是否用于读的能力
 		if (hasOpenReadWriteCloseCapability(provider) || hasReadWriteCapability(provider) || hasFileReadStreamCapability(provider)) {
 			return provider;
 		}
 
+		// 否则抛错
 		throw new Error(`Filesystem provider for scheme '${resource.scheme}' neither has FileReadWrite, FileReadStream nor FileOpenReadWriteClose capability which is needed for the read operation.`);
 	}
 
@@ -503,11 +509,14 @@ export class FileService extends Disposable implements IFileService {
 			// this reduces all the overhead the buffered reading
 			// has (open, read, close) if the provider supports
 			// unbuffered reading.
+			// 一个优化：使用者不关心buffer，这里明确指定preferUnbuffered参数以unbuffered方式读取文件，
+			// 能够减少buffer操作带来的开销
 			preferUnbuffered: true
 		}, token);
 
 		return {
 			...stream,
+			// 重新将流转换成VSBuffer再返回
 			value: await streamToBuffer(stream.value)
 		};
 	}
@@ -549,6 +558,8 @@ export class FileService extends Disposable implements IFileService {
 			}
 
 			// read unbuffered
+			// 以下情况以unbuffered的方式读取文件
+			// 1、原子读取 2、没有buffered方式读取的能力 3、通过preferUnbuffered参数明确指定以unbuffered的形式
 			if (
 				(options?.atomic && hasFileAtomicReadCapability(provider)) ||								// atomic reads are always unbuffered
 				!(hasOpenReadWriteCloseCapability(provider) || hasFileReadStreamCapability(provider)) ||	// provider has no buffered capability
@@ -614,34 +625,43 @@ export class FileService extends Disposable implements IFileService {
 		return stream;
 	}
 
+	// unbuffered形式读取文件
 	private readFileUnbuffered(provider: IFileSystemProviderWithFileReadWriteCapability | IFileSystemProviderWithFileAtomicReadCapability, resource: URI, options?: IReadFileOptions & IReadFileStreamOptions): VSBufferReadableStream {
+		// 创建一个可写流
 		const stream = newWriteableStream<VSBuffer>(data => VSBuffer.concat(data));
 
 		// Read the file into the stream async but do not wait for
 		// this to complete because streams work via events
+		// 异步地将文件读取到流中，但不等待读取完成，因为流通过事件的形式工作
 		(async () => {
 			try {
 				let buffer: Uint8Array;
 				if (options?.atomic && hasFileAtomicReadCapability(provider)) {
+					// 调用provider的读取方法读取文件，指定原子读取参数
 					buffer = await provider.readFile(resource, { atomic: true });
 				} else {
+					// 调用provider的读取方法读取文件
 					buffer = await provider.readFile(resource);
 				}
 
 				// respect position option
+				// 处理position参数
 				if (typeof options?.position === 'number') {
 					buffer = buffer.slice(options.position);
 				}
 
 				// respect length option
+				// 处理length参数
 				if (typeof options?.length === 'number') {
 					buffer = buffer.slice(0, options.length);
 				}
 
 				// Throw if file is too large to load
+				// 如果文件内容超出限制，则抛错
 				this.validateReadFileLimits(resource, buffer.byteLength, options);
 
 				// End stream with data
+				// 结束流
 				stream.end(VSBuffer.wrap(buffer));
 			} catch (err) {
 				stream.error(err);
@@ -649,6 +669,7 @@ export class FileService extends Disposable implements IFileService {
 			}
 		})();
 
+		// 返回流
 		return stream;
 	}
 

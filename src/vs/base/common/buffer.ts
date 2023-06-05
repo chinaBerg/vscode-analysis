@@ -277,6 +277,7 @@ export function bufferToReadable(buffer: VSBuffer): VSBufferReadable {
 	return streams.toReadable<VSBuffer>(buffer);
 }
 
+// 将流转换成VSBuffer
 export function streamToBuffer(stream: streams.ReadableStream<VSBuffer>): Promise<VSBuffer> {
 	return streams.consumeStream<VSBuffer>(stream, chunks => VSBuffer.concat(chunks));
 }
