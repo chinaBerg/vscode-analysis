@@ -9,9 +9,18 @@ declare const Buffer: any;
 
 const hasBuffer = (typeof Buffer !== 'undefined');
 
+// 文本编码器
 let textEncoder: TextEncoder | null;
+// 文本解码器
 let textDecoder: TextDecoder | null;
 
+/**
+ * VSBuffer
+ * VsCode 封装的Buffer对象，
+ * NodeJs环境下使用Node的Buffer模块实现，
+ * Web环境下使用8位无符号整型数组的Unit8Array和文本编解码实现。
+ * 使用Unit8Array的原因是，Node的Buffer实际是Unit8Array的子类
+ */
 export class VSBuffer {
 
 	/**
@@ -69,9 +78,12 @@ export class VSBuffer {
 	/**
 	 * When running in a nodejs context, the backing store for the returned `VSBuffer` instance
 	 * might use a nodejs Buffer allocated from node's Buffer pool, which is not transferrable.
+	 * 将字节数组转换成VsBuffer
 	 */
 	static fromByteArray(source: number[]): VSBuffer {
+		// 根据字节数组长度申请缓冲区
 		const result = VSBuffer.alloc(source.length);
+		// 迭代字节数组，将数据推入缓冲区对象
 		for (let i = 0, len = source.length; i < len; i++) {
 			result.buffer[i] = source[i];
 		}
@@ -128,11 +140,13 @@ export class VSBuffer {
 	 */
 	toString(): string {
 		if (hasBuffer) {
+			// 调用buffer的toString方法进行转换
 			return this.buffer.toString();
 		} else {
 			if (!textDecoder) {
 				textDecoder = new TextDecoder();
 			}
+			// 利用文本解码器将字节流转换成字符串
 			return textDecoder.decode(this.buffer);
 		}
 	}
