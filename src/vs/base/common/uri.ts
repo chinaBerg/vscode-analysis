@@ -8,19 +8,25 @@ import { MarshalledId } from 'vs/base/common/marshallingIds';
 import * as paths from 'vs/base/common/path';
 import { isWindows } from 'vs/base/common/platform';
 
+// scheme正则，必须单词字符开头，后面可以跟单词字符、数字、+-.符号
 const _schemePattern = /^\w[\w\d+.-]*$/;
+// 验证/开头的正则表达式
 const _singleSlashStart = /^\//;
+// 验证//开头的正则表达式
 const _doubleSlashStart = /^\/\//;
 
+// 验证uri是否合法的最小验证
 function _validateUri(ret: URI, _strict?: boolean): void {
 
 	// scheme, must be set
+	// 严格模式下未设置scheme则抛错
 	if (!ret.scheme && _strict) {
 		throw new Error(`[UriError]: Scheme is missing: {scheme: "", authority: "${ret.authority}", path: "${ret.path}", query: "${ret.query}", fragment: "${ret.fragment}"}`);
 	}
 
 	// scheme, https://tools.ietf.org/html/rfc3986#section-3.1
 	// ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )
+	// 验证scheme命名是否合法
 	if (ret.scheme && !_schemePattern.test(ret.scheme)) {
 		throw new Error('[UriError]: Scheme contains illegal characters.');
 	}
@@ -32,10 +38,12 @@ function _validateUri(ret: URI, _strict?: boolean): void {
 	// with two slash characters ("//").
 	if (ret.path) {
 		if (ret.authority) {
+			// 存在authority时，path必须/开头
 			if (!_singleSlashStart.test(ret.path)) {
 				throw new Error('[UriError]: If a URI contains an authority component, then the path component must either be empty or begin with a slash ("/") character');
 			}
 		} else {
+			// 不存在authority时，path不能//开头
 			if (_doubleSlashStart.test(ret.path)) {
 				throw new Error('[UriError]: If a URI does not contain an authority component, then the path cannot begin with two slash characters ("//")');
 			}
@@ -156,6 +164,7 @@ export class URI implements UriComponents {
 	 */
 	protected constructor(schemeOrData: string | UriComponents, authority?: string, path?: string, query?: string, fragment?: string, _strict: boolean = false) {
 
+		// 根据传入的参数类型初始化uri各组成部分的值
 		if (typeof schemeOrData === 'object') {
 			this.scheme = schemeOrData.scheme || _empty;
 			this.authority = schemeOrData.authority || _empty;
@@ -172,6 +181,7 @@ export class URI implements UriComponents {
 			this.query = query || _empty;
 			this.fragment = fragment || _empty;
 
+			// 验证uri是否合法
 			_validateUri(this, _strict);
 		}
 	}
@@ -299,6 +309,8 @@ export class URI implements UriComponents {
 	```
 	 *
 	 * @param path A file system path (see `URI#fsPath`)
+	 *
+	 * 根据一个文件系统路径创建URI对象
 	 */
 	static file(path: string): URI {
 
@@ -307,12 +319,14 @@ export class URI implements UriComponents {
 		// normalize to fwd-slashes on windows,
 		// on other systems bwd-slashes are valid
 		// filename character, eg /f\oo/ba\r.txt
+		// windows系统下路径中的\字符转成/格式
 		if (isWindows) {
 			path = path.replace(/\\/g, _slash);
 		}
 
 		// check for authority as used in UNC shares
 		// or use the path as given
+		// 以//开头时，获取authority和path部分
 		if (path[0] === _slash && path[1] === _slash) {
 			const idx = path.indexOf(_slash, 2);
 			if (idx === -1) {
@@ -324,6 +338,7 @@ export class URI implements UriComponents {
 			}
 		}
 
+		// 创建一个scheme为file的uri对象
 		return new Uri('file', authority, path, _empty, _empty);
 	}
 
