@@ -346,29 +346,41 @@ export class FileService extends Disposable implements IFileService {
 		return true;
 	}
 
+	// 验证是否可以创建文件
 	private async doValidateCreateFile(resource: URI, options?: ICreateFileOptions): Promise<void> {
 
 		// validate overwrite
+		// 文件已存在且不期望覆盖的时候抛出错误
 		if (!options?.overwrite && await this.exists(resource)) {
 			throw new FileOperationError(localize('fileExists', "Unable to create file '{0}' that already exists when overwrite flag is not set", this.resourceForError(resource)), FileOperationResult.FILE_MODIFIED_SINCE, options);
 		}
 	}
 
+	/**
+	 * 创建文件
+	 */
 	async createFile(resource: URI, bufferOrReadableOrStream: VSBuffer | VSBufferReadable | VSBufferReadableStream = VSBuffer.fromString(''), options?: ICreateFileOptions): Promise<IFileStatWithMetadata> {
 
 		// validate
+		// 验证是否可以创建
 		await this.doValidateCreateFile(resource, options);
 
 		// do write into file (this will create it too)
+		// 利用writeFile方法创建
 		const fileStat = await this.writeFile(resource, bufferOrReadableOrStream);
 
 		// events
+		// 触发一个文件创建的操作事件
 		this._onDidRunOperation.fire(new FileOperationEvent(resource, FileOperation.CREATE, fileStat));
 
 		return fileStat;
 	}
 
+	/**
+	 * 文件写入
+	 */
 	async writeFile(resource: URI, bufferOrReadableOrStream: VSBuffer | VSBufferReadable | VSBufferReadableStream, options?: IWriteFileOptions): Promise<IFileStatWithMetadata> {
+		// 获取provider，并且provider只拥有读取能力时抛错
 		const provider = this.throwIfFileSystemIsReadonly(await this.withWriteProvider(resource), resource);
 		const { providerExtUri } = this.getExtUri(provider);
 
@@ -378,6 +390,7 @@ export class FileService extends Disposable implements IFileService {
 			const stat = await this.validateWriteFile(provider, resource, options);
 
 			// mkdir recursively as needed
+			// 确保文件夹存在
 			if (!stat) {
 				await this.mkdirp(provider, providerExtUri.dirname(resource));
 			}
@@ -388,6 +401,7 @@ export class FileService extends Disposable implements IFileService {
 			// to provide we continue to write buffered.
 			let bufferOrReadableOrStreamOrBufferedStream: VSBuffer | VSBufferReadable | VSBufferReadableStream | VSBufferReadableBufferedStream;
 			if (hasReadWriteCapability(provider) && !(bufferOrReadableOrStream instanceof VSBuffer)) {
+				// 可读流
 				if (isReadableStream(bufferOrReadableOrStream)) {
 					const bufferedStream = await peekStream(bufferOrReadableOrStream, 3);
 					if (bufferedStream.ended) {
@@ -421,6 +435,9 @@ export class FileService extends Disposable implements IFileService {
 		return this.resolve(resource, { resolveMetadata: true });
 	}
 
+	/**
+	 * 验证可写文件
+	 */
 	private async validateWriteFile(provider: IFileSystemProvider, resource: URI, options?: IWriteFileOptions): Promise<IStat | undefined> {
 
 		// Validate unlock support
@@ -906,6 +923,7 @@ export class FileService extends Disposable implements IFileService {
 	}
 
 	private getExtUri(provider: IFileSystemProvider): { providerExtUri: IExtUri; isPathCaseSensitive: boolean } {
+		// 路径是否区分大小写
 		const isPathCaseSensitive = this.isPathCaseSensitive(provider);
 
 		return {
@@ -1165,9 +1183,11 @@ export class FileService extends Disposable implements IFileService {
 	private readonly writeQueue = this._register(new ResourceQueue());
 
 	private async doWriteBuffered(provider: IFileSystemProviderWithOpenReadWriteCloseCapability, resource: URI, options: IWriteFileOptions | undefined, readableOrStreamOrBufferedStream: VSBufferReadable | VSBufferReadableStream | VSBufferReadableBufferedStream): Promise<void> {
+		// 通过资源队列，异步串行执行写的操作
 		return this.writeQueue.queueFor(resource, this.getExtUri(provider).providerExtUri).queue(async () => {
 
 			// open handle
+			// 利用provider打开文件
 			const handle = await provider.open(resource, { create: true, unlock: options?.unlock ?? false });
 
 			// write into handle until all bytes from buffer have been written
@@ -1182,6 +1202,7 @@ export class FileService extends Disposable implements IFileService {
 			} finally {
 
 				// close handle always
+				// 关闭文件
 				await provider.close(handle);
 			}
 		});
@@ -1202,6 +1223,8 @@ export class FileService extends Disposable implements IFileService {
 			}
 
 			// If the stream has been consumed, return early
+			// 如果流已经结束，则直接retrun
+			// 否则通过listenStream监听流的消费（由调用方发起，匹配上文的优化策略），执行onData回调
 			if (streamOrBufferedStream.ended) {
 				return;
 			}
@@ -1219,9 +1242,11 @@ export class FileService extends Disposable implements IFileService {
 				onData: async chunk => {
 
 					// pause stream to perform async write operation
+					// 先暂停流，等待下文的消费完成后再重新resume
 					stream.pause();
 
 					try {
+						// 执行写的操作
 						await this.doWriteBuffer(provider, handle, chunk, chunk.byteLength, posInFile, 0);
 					} catch (error) {
 						return reject(error);
@@ -1233,6 +1258,7 @@ export class FileService extends Disposable implements IFileService {
 					// run this on the next tick to prevent increasing the
 					// execution stack because resume() may call the event
 					// handler again before finishing.
+					// 写成功后再resume继续消费
 					setTimeout(() => stream.resume());
 				},
 				onError: error => reject(error),
@@ -1257,6 +1283,7 @@ export class FileService extends Disposable implements IFileService {
 		while (totalBytesWritten < length) {
 
 			// Write through the provider
+			// 调用provider的write方法写入
 			const bytesWritten = await provider.write(handle, posInFile + totalBytesWritten, buffer.buffer, posInBuffer + totalBytesWritten, length - totalBytesWritten);
 			totalBytesWritten += bytesWritten;
 		}
@@ -1365,7 +1392,9 @@ export class FileService extends Disposable implements IFileService {
 		await this.doWriteUnbuffered(targetProvider, target, undefined, buffer);
 	}
 
+	// 注入的文件系统只拥有读取的能力时，抛出错误
 	protected throwIfFileSystemIsReadonly<T extends IFileSystemProvider>(provider: T, resource: URI): T {
+		// 未运算判断capabilities是否等于FileSystemProviderCapabilities.Readonly
 		if (provider.capabilities & FileSystemProviderCapabilities.Readonly) {
 			throw new FileOperationError(localize('err.readonly', "Unable to modify readonly file '{0}'", this.resourceForError(resource)), FileOperationResult.FILE_PERMISSION_DENIED);
 		}

@@ -93,8 +93,10 @@ export class VSBuffer {
 	/**
 	 * When running in a nodejs context, the backing store for the returned `VSBuffer` instance
 	 * might use a nodejs Buffer allocated from node's Buffer pool, which is not transferrable.
+	 * 将多个VSBuffer聚合成一个新的VSBuffer
 	 */
 	static concat(buffers: VSBuffer[], totalLength?: number): VSBuffer {
+		// 获取多个VSBuffer的长度之和
 		if (typeof totalLength === 'undefined') {
 			totalLength = 0;
 			for (let i = 0, len = buffers.length; i < len; i++) {
@@ -102,8 +104,10 @@ export class VSBuffer {
 			}
 		}
 
+		// 申请一个新的VSBuffer
 		const ret = VSBuffer.alloc(totalLength);
 		let offset = 0;
+		// 依次将每个VSBuffer的数据塞进新的VSBuffer之中
 		for (let i = 0, len = buffers.length; i < len; i++) {
 			const element = buffers[i];
 			ret.set(element, offset);

@@ -748,6 +748,9 @@ export interface IFileOperationEventWithMetadata extends IFileOperationEvent {
 	readonly target: IFileStatWithMetadata;
 }
 
+/**
+ * 文件操作的事件
+ */
 export class FileOperationEvent implements IFileOperationEvent {
 
 	constructor(resource: URI, operation: FileOperation.DELETE | FileOperation.WRITE);
