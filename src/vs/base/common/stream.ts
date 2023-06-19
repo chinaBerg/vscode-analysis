@@ -11,6 +11,10 @@ import { DisposableStore, IDisposable, toDisposable } from 'vs/base/common/lifec
  */
 export type ReadableStreamEventPayload<T> = T | Error | 'end';
 
+/**
+ * 可读流事件接口，
+ * 泛型 T 描述了 data 事件的 chunk 数据类型
+ */
 export interface ReadableStreamEvents<T> {
 
 	/**
@@ -23,11 +27,16 @@ export interface ReadableStreamEvents<T> {
 	 *
 	 * Use `listenStream` as a helper method to listen to
 	 * stream events in the right order.
+	 *
+	 * on方法监听的data事件，
+	 * 注意：一旦监听data事件，流将会进入流动模式（手动pause了除外）。
+	 * 请使用listenStream方法正确的添加监听顺序
 	 */
 	on(event: 'data', callback: (data: T) => void): void;
 
 	/**
 	 * Emitted when any error occurs.
+	 * on方法监听的error事件
 	 */
 	on(event: 'error', callback: (err: Error) => void): void;
 
@@ -35,6 +44,7 @@ export interface ReadableStreamEvents<T> {
 	 * The 'end' event is emitted when there is no more data
 	 * to be consumed from the stream. The 'end' event will
 	 * not be emitted unless the data is completely consumed.
+	 * on方法监听的end事件
 	 */
 	on(event: 'end', callback: () => void): void;
 }
@@ -42,26 +52,31 @@ export interface ReadableStreamEvents<T> {
 /**
  * A interface that emulates the API shape of a node.js readable
  * stream for use in native and web environments.
+ * 可读流的接口，用于Node和Web环境
  */
 export interface ReadableStream<T> extends ReadableStreamEvents<T> {
 
 	/**
 	 * Stops emitting any events until resume() is called.
+	 * 暂停流
 	 */
 	pause(): void;
 
 	/**
 	 * Starts emitting events again after pause() was called.
+	 * 消费流
 	 */
 	resume(): void;
 
 	/**
 	 * Destroys the stream and stops emitting any event.
+	 * 销毁流
 	 */
 	destroy(): void;
 
 	/**
 	 * Allows to remove a listener that was previously added.
+	 * 移除侦听事件
 	 */
 	removeListener(event: string, callback: Function): void;
 }
@@ -69,6 +84,7 @@ export interface ReadableStream<T> extends ReadableStreamEvents<T> {
 /**
  * A interface that emulates the API shape of a node.js readable
  * for use in native and web environments.
+ * 模拟Node的Readable接口
  */
 export interface Readable<T> {
 
@@ -79,18 +95,23 @@ export interface Readable<T> {
 	read(): T | null;
 }
 
+/**
+ * 是否是可读的
+ */
 export function isReadable<T>(obj: unknown): obj is Readable<T> {
 	const candidate = obj as Readable<T> | undefined;
 	if (!candidate) {
 		return false;
 	}
 
+	// 只要拥有read方法则认为是可读的
 	return typeof candidate.read === 'function';
 }
 
 /**
  * A interface that emulates the API shape of a node.js writeable
  * stream for use in native and web environments.
+ * 可写流接口
  */
 export interface WriteableStream<T> extends ReadableStream<T> {
 
@@ -104,6 +125,12 @@ export interface WriteableStream<T> extends ReadableStream<T> {
 	 * that should be awaited on before writing more data.
 	 * Otherwise there is a risk of buffering a large number
 	 * of data chunks without consumer.
+	 *
+	 * 如果流处于流动状态，则往流写入数据会触发on('data')事件，
+	 * 否则会缓存数据直到流进入流动状态。
+	 *
+	 * 如果配置了highWaterMark参数并且写入数据超出限制时，会返回一个promise对象用于在
+	 * 写入更多数据之前进行等待。否则，会存在未消费情况下对接大量数据的风险。
 	 */
 	write(data: T): void | Promise<void>;
 
@@ -129,36 +156,48 @@ export interface WriteableStream<T> extends ReadableStream<T> {
  * A stream that has a buffer already read. Returns the original stream
  * that was read as well as the chunks that got read.
  *
+ * 可读的BufferedStream流
+ *
  * The `ended` flag indicates if the stream has been fully consumed.
  */
 export interface ReadableBufferedStream<T> {
 
 	/**
 	 * The original stream that is being read.
+	 * 已经被读取的原始流
 	 */
 	stream: ReadableStream<T>;
 
 	/**
 	 * An array of chunks already read from this stream.
+	 * 从该流中已经读取的chunks
 	 */
 	buffer: T[];
 
 	/**
 	 * Signals if the stream has ended or not. If not, consumers
 	 * should continue to read from the stream until consumed.
+	 * 指示流是否完全被消费，如果没有，消费者应该继续从流中读取，直到消费完为止
 	 */
 	ended: boolean;
 }
 
+/**
+ * 判断目标是否为可读流
+ */
 export function isReadableStream<T>(obj: unknown): obj is ReadableStream<T> {
 	const candidate = obj as ReadableStream<T> | undefined;
 	if (!candidate) {
 		return false;
 	}
 
+	// 鸭式辨型，只要拥有了on\puse\resume\destroy方法则认为是可读流
 	return [candidate.on, candidate.pause, candidate.resume, candidate.destroy].every(fn => typeof fn === 'function');
 }
 
+/**
+ * 判断目标是否为ReadableBufferedStream
+ */
 export function isReadableBufferedStream<T>(obj: unknown): obj is ReadableBufferedStream<T> {
 	const candidate = obj as ReadableBufferedStream<T> | undefined;
 	if (!candidate) {
@@ -598,6 +637,9 @@ export function listenStream<T>(stream: ReadableStreamEvents<T>, listener: IStre
  * Helper to peek up to `maxChunks` into a stream. The return type signals if
  * the stream has ended or not. If not, caller needs to add a `data` listener
  * to continue reading.
+ *
+ * 一个帮助程序，用于向上窥探流的maxChunks。
+ * 返回的ended值用于指示流是否已经结束，如果没有结束则需要调用者自己添加data监听器继续获取流
  */
 export function peekStream<T>(stream: ReadableStream<T>, maxChunks: number): Promise<ReadableBufferedStream<T>> {
 	return new Promise((resolve, reject) => {
@@ -611,13 +653,16 @@ export function peekStream<T>(stream: ReadableStream<T>, maxChunks: number): Pro
 			buffer.push(chunk);
 
 			// We reached maxChunks and thus need to return
+			// 达到maxChunks数量时需要返回
 			if (buffer.length > maxChunks) {
 
 				// Dispose any listeners and ensure to pause the
 				// stream so that it can be consumed again by caller
 				streamListeners.dispose();
+				// 暂停流
 				stream.pause();
 
+				// 此时流并未end，因此返回的ended值为false
 				return resolve({ stream, buffer, ended: false });
 			}
 		};
@@ -629,6 +674,7 @@ export function peekStream<T>(stream: ReadableStream<T>, maxChunks: number): Pro
 
 		// End Listener
 		const endListener = () => {
+			// 此时流已经未end，因此返回的ended值为true
 			return resolve({ stream, buffer, ended: true });
 		};
 
@@ -642,6 +688,7 @@ export function peekStream<T>(stream: ReadableStream<T>, maxChunks: number): Pro
 		// this can turn the stream into flowing mode and we
 		// want `error` events to be received as well.
 		streamListeners.add(toDisposable(() => stream.removeListener('data', dataListener)));
+		// 监听data事件
 		stream.on('data', dataListener);
 	});
 }
