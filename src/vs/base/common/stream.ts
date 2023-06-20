@@ -224,10 +224,16 @@ export interface ITransformer<Original, Transformed> {
 	error?: IErrorTransformer;
 }
 
+/**
+ * 实例化一个可写流
+ */
 export function newWriteableStream<T>(reducer: IReducer<T>, options?: WriteableStreamOptions): WriteableStream<T> {
 	return new WriteableStreamImpl<T>(reducer, options);
 }
 
+/**
+ * 可写流Options选项接口
+ */
 export interface WriteableStreamOptions {
 
 	/**
@@ -238,22 +244,36 @@ export interface WriteableStreamOptions {
 	highWaterMark?: number;
 }
 
+/**
+ * VsCode的可写流实现
+ */
 class WriteableStreamImpl<T> implements WriteableStream<T> {
 
+	/**
+	 * 流的状态
+	 */
 	private readonly state = {
+		/** 是否流动中 */
 		flowing: false,
+		/** 是否结束 */
 		ended: false,
+		/** 是否已销毁 */
 		destroyed: false
 	};
 
+	/** buffer */
 	private readonly buffer = {
 		data: [] as T[],
 		error: [] as Error[]
 	};
 
+	/** 侦听器 */
 	private readonly listeners = {
+		/** on('data')的侦听器 */
 		data: [] as { (data: T): void }[],
+		/** on('error')的侦听器 */
 		error: [] as { (error: Error): void }[],
+		/** on('end')的侦听器 */
 		end: [] as { (): void }[]
 	};
 
@@ -261,44 +281,55 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 
 	constructor(private reducer: IReducer<T>, private options?: WriteableStreamOptions) { }
 
+	// 暂停
 	pause(): void {
 		if (this.state.destroyed) {
 			return;
 		}
 
+		// 将flowing状态设置为false
 		this.state.flowing = false;
 	}
 
+	// 切换为流动模式
 	resume(): void {
 		if (this.state.destroyed) {
 			return;
 		}
 
 		if (!this.state.flowing) {
+			// 将flowing状态设置为true
 			this.state.flowing = true;
 
 			// emit buffered events
+			// 触发相关事件
 			this.flowData();
 			this.flowErrors();
 			this.flowEnd();
 		}
 	}
 
+	// 往可写流中写入数据
 	write(data: T): void | Promise<void> {
+		// 流已销毁直接return
 		if (this.state.destroyed) {
 			return;
 		}
 
 		// flowing: directly send the data to listeners
+		// 流动状态下：emit data事件给监听者
 		if (this.state.flowing) {
 			this.emitData(data);
 		}
 
 		// not yet flowing: buffer data until flowing
+		// 非流动状态下：缓存data数据，一直到切换为流动状态为止
 		else {
 			this.buffer.data.push(data);
 
 			// highWaterMark: if configured, signal back when buffer reached limits
+			// 缓存数据超出阀值时，返回一个等待的指示，
+			// 实际就是将resolve缓存到pendingWritePromises数组中等待被调用
 			if (typeof this.options?.highWaterMark === 'number' && this.buffer.data.length > this.options.highWaterMark) {
 				return new Promise(resolve => this.pendingWritePromises.push(resolve));
 			}
@@ -344,10 +375,13 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 		}
 	}
 
+	// 触发on('data')添加的所有侦听器事件
 	private emitData(data: T): void {
+		// slice是为了防止listeners数据突变
 		this.listeners.data.slice(0).forEach(listener => listener(data)); // slice to avoid listener mutation from delivering event
 	}
 
+	// 触发on('error')添加的所有侦听器事件
 	private emitError(error: Error): void {
 		if (this.listeners.error.length === 0) {
 			onUnexpectedError(error); // nobody listened to this error so we log it as unexpected
@@ -356,6 +390,7 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 		}
 	}
 
+	// 触发on('end')添加的所有侦听器事件
 	private emitEnd(): void {
 		this.listeners.end.slice(0).forEach(listener => listener()); // slice to avoid listener mutation from delivering event
 	}
@@ -374,6 +409,7 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 
 				// switch into flowing mode as soon as the first 'data'
 				// listener is added and we are not yet in flowing mode
+				// 侦听data事件后立即将流切换为流动模式
 				this.resume();
 
 				break;
@@ -404,6 +440,7 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 		}
 	}
 
+	// 移除指定事件的指定侦听器
 	removeListener(event: string, callback: Function): void {
 		if (this.state.destroyed) {
 			return;
@@ -433,31 +470,39 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 		}
 	}
 
+	// 流动数据
 	private flowData(): void {
 		if (this.buffer.data.length > 0) {
+			// 通过reducer将缓存的data数据处理完整的数据
 			const fullDataBuffer = this.reducer(this.buffer.data);
 
+			// 触发on('data')添加的所有侦听器事件
 			this.emitData(fullDataBuffer);
-
+			// 置空缓存数据
 			this.buffer.data.length = 0;
 
 			// When the buffer is empty, resolve all pending writers
+			// resolve所有的超出等待指示
 			const pendingWritePromises = [...this.pendingWritePromises];
 			this.pendingWritePromises.length = 0;
 			pendingWritePromises.forEach(pendingWritePromise => pendingWritePromise());
 		}
 	}
 
+	// 流动错误
 	private flowErrors(): void {
 		if (this.listeners.error.length > 0) {
+			// 遍历所有错误数据，依次触发所有的错误事件侦听器
 			for (const error of this.buffer.error) {
 				this.emitError(error);
 			}
 
+			// 置空错误
 			this.buffer.error.length = 0;
 		}
 	}
 
+	// 流动结束
 	private flowEnd(): boolean {
 		if (this.state.ended) {
 			this.emitEnd();
@@ -468,7 +513,9 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 		return false;
 	}
 
+	// 销毁流
 	destroy(): void {
+		// 重置所有状态
 		if (!this.state.destroyed) {
 			this.state.destroyed = true;
 			this.state.ended = true;
@@ -487,11 +534,14 @@ class WriteableStreamImpl<T> implements WriteableStream<T> {
 
 /**
  * Helper to fully read a T readable into a T.
+ * 一个工具函数，
+ * 消费可读流chunks，聚合成一个完整数据返回
  */
 export function consumeReadable<T>(readable: Readable<T>, reducer: IReducer<T>): T {
 	const chunks: T[] = [];
 
 	let chunk: T | null;
+	// 循环调用可读流的read方法获取数据
 	while ((chunk = readable.read()) !== null) {
 		chunks.push(chunk);
 	}
@@ -503,6 +553,8 @@ export function consumeReadable<T>(readable: Readable<T>, reducer: IReducer<T>):
  * Helper to read a T readable up to a maximum of chunks. If the limit is
  * reached, will return a readable instead to ensure all data can still
  * be read.
+ * 一个工具函数，
+ * 读取maxChunks次可读流中的数据，如果流未被消费完则返回可读流用于继续消费，否则直接返回聚合数据
  */
 export function peekReadable<T>(readable: Readable<T>, reducer: IReducer<T>, maxChunks: number): T | Readable<T> {
 	const chunks: T[] = [];
@@ -514,6 +566,7 @@ export function peekReadable<T>(readable: Readable<T>, reducer: IReducer<T>, max
 
 	// If the last chunk is null, it means we reached the end of
 	// the readable and return all the data at once
+	// 在maxChunks次之前已经消费完流，则直接返回流的聚合数据
 	if (chunk === null && chunks.length > 0) {
 		return reducer(chunks);
 	}
@@ -526,11 +579,13 @@ export function peekReadable<T>(readable: Readable<T>, reducer: IReducer<T>, max
 		read: () => {
 
 			// First consume chunks from our array
+			// 先返回chunks中的数据
 			if (chunks.length > 0) {
 				return chunks.shift()!;
 			}
 
 			// Then ensure to return our last read chunk
+			// 确保最后一次读取的chunk被处理（第maxChunks次）
 			if (typeof chunk !== 'undefined') {
 				const lastReadChunk = chunk;
 
@@ -542,6 +597,7 @@ export function peekReadable<T>(readable: Readable<T>, reducer: IReducer<T>, max
 			}
 
 			// Finally delegate back to the Readable
+			// 调用可读流的read方法获取流中剩余的数据
 			return readable.read();
 		}
 	};
