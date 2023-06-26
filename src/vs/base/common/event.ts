@@ -119,9 +119,38 @@ export namespace Event {
 	 * @param event The event source for the new event.
 	 * @param map The mapping function.
 	 * @param disposable A disposable store to add the new EventEmitter to.
+	 * map的本质作用是根据已有的event事件侦听器，返回一个新的事件侦听器，新的事件侦听器会在事件触发时对数据进行一次map转换。
+	 * 核心实现类似于如下伪代码：
+		function map<I, O>(event: Event<I>, map: (i: I) => O): Event<O> {
+			const options= {
+				// event只需要添加一次，防止emitter被重复触发
+				onWillAddFirstListener() {
+					event(
+						i => emitter.fire.call(emitter, map(i)),
+					);
+				},
+			};
+			const emitter = new Emitter<O>(options);
+			return emitter.event;
+		}
+	 * map的作用实际是根据event事件侦听器创建一个新的事件侦听器，新事件侦听器类似于旧的代理，
+	 * 通过新的侦听器第一次侦听事件时会调用旧侦听器进行事件侦听（旧侦听器绑定的回调逻辑实际是触发新侦听器的事件）。
 	 */
 	export function map<I, O>(event: Event<I>, map: (i: I) => O, disposable?: DisposableStore): Event<O> {
-		return snapshot((listener, thisArgs = null, disposables?) => event(i => listener.call(thisArgs, map(i)), null, disposables), disposable);
+		// 利用snapshot创建一个Emitter的快照，返回new Emitter().event侦听器，
+		return snapshot(
+			(listener, thisArgs = null, disposables?) => {
+				// 调用原event侦听一个事件，原事件触发后会执行回调，即listener(map(i))
+				// listener即snapshot创建的emitter.fire,
+				// 并且对触发事件时传递的数据进行map转换
+				return event(
+					i => listener.call(thisArgs, map(i)),
+					null,
+					disposables,
+				);
+			},
+			disposable
+		);
 	}
 
 	/**
@@ -176,10 +205,14 @@ export namespace Event {
 		}, disposable);
 	}
 
+	// 创建一个Emitter触发的快照，
+	// 在添加第一个侦听器时调用event并传递emitter.fire的引用,
+	// 移除最后一个侦听器时销毁
 	function snapshot<T>(event: Event<T>, disposable: DisposableStore | undefined): Event<T> {
 		let listener: IDisposable | undefined;
 
 		const options: EmitterOptions | undefined = {
+			// event只需要添加一次，防止emitter被重复触发
 			onWillAddFirstListener() {
 				listener = event(emitter.fire, emitter);
 			},
@@ -438,12 +471,28 @@ export namespace Event {
 		removeListener(event: string | symbol, listener: Function): unknown;
 	}
 
+	/**
+	 * 根据Node的eventEmitter生成VSCode的Event触发器，
+	 * 本质对node emitter的事件监听进行了一层包裹，变成了VSCode Event触发器的事件监听，
+	 * 在未来的某个时刻，node emitter监听的事件被触发时（例如由ipcRenderer.invoke导致ipcMain.on触发）fn立即执行，
+	 * fn内部通过result.fire实际触发了VSCode Event的事件触发逻辑。
+	 * @param emitter NodeJs的eventEmitter
+	 * @param eventName 事件名称
+	 * @param map 转换函数
+	 * @returns VSCode的事件触发器
+	 */
 	export function fromNodeEventEmitter<T>(emitter: NodeEventEmitter, eventName: string, map: (...args: any[]) => T = id => id): Event<T> {
 		const fn = (...args: any[]) => result.fire(map(...args));
 		const onFirstListenerAdd = () => emitter.on(eventName, fn);
 		const onLastListenerRemove = () => emitter.removeListener(eventName, fn);
-		const result = new Emitter<T>({ onWillAddFirstListener: onFirstListenerAdd, onDidRemoveLastListener: onLastListenerRemove });
+		// 利用fromNodeEventEmitter创建的触发器添加第一个侦听器后，触发emitter的eventName事件，
+		// 移除最后一个侦听器后移除emitter的eventName事件，
+		const result = new Emitter<T>({
+			onWillAddFirstListener: onFirstListenerAdd,
+			onDidRemoveLastListener: onLastListenerRemove
+		});
 
+		// 返回触发器
 		return result.event;
 	}
 
