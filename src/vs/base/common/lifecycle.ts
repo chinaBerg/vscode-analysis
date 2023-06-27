@@ -195,6 +195,7 @@ export function disposeIfDisposable<T extends IDisposable | object>(disposables:
 
 /**
  * Combine multiple disposable values into a single {@link IDisposable}.
+ * 将多个disposable组合成一个
  */
 export function combinedDisposable(...disposables: IDisposable[]): IDisposable {
 	const parent = toDisposable(() => dispose(disposables));
@@ -204,6 +205,7 @@ export function combinedDisposable(...disposables: IDisposable[]): IDisposable {
 
 /**
  * Turn a function that implements dispose into an {@link IDisposable}.
+ * 创建一个dispose对象
  */
 export function toDisposable(fn: () => void): IDisposable {
 	const self = trackDisposable({

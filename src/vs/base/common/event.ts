@@ -87,10 +87,11 @@ export namespace Event {
 			let result: IDisposable | undefined = undefined;
 			// 给原事件绑定回调函数
 			result = event(e => {
-				// 控制仅触发一次
 				if (didFire) {
 					return;
 				} else if (result) {
+					// result.dispose调用后会移除event添加的事件回调
+					// 因此事件二次触发时由于事件回调已被移除，不会多次执行回调，从而实现once的效果
 					result.dispose();
 				} else {
 					didFire = true;
@@ -133,8 +134,6 @@ export namespace Event {
 			const emitter = new Emitter<O>(options);
 			return emitter.event;
 		}
-	 * map的作用实际是根据event事件侦听器创建一个新的事件侦听器，新事件侦听器类似于旧的代理，
-	 * 通过新的侦听器第一次侦听事件时会调用旧侦听器进行事件侦听（旧侦听器绑定的回调逻辑实际是触发新侦听器的事件）。
 	 */
 	export function map<I, O>(event: Event<I>, map: (i: I) => O, disposable?: DisposableStore): Event<O> {
 		// 利用snapshot创建一个Emitter的快照，返回new Emitter().event侦听器，
@@ -166,12 +165,22 @@ export namespace Event {
 	 * *NOTE* that this function returns an `Event` and it MUST be called with a `DisposableStore` whenever the returned
 	 * event is accessible to "third parties", e.g the event is a public property. Otherwise a leaked listener on the
 	 * returned event causes this utility to leak a listener on the original event.
+	 *
+	 * filter的本质作用是根据已有的event事件侦听器，返回一个新的事件侦听器，
+	 * 新的事件侦听器会在事件触发时校验是否满足filter参数的过滤条件，满足条件后才会真正触发。
 	 */
 	export function filter<T, U>(event: Event<T | U>, filter: (e: T | U) => e is T, disposable?: DisposableStore): Event<T>;
 	export function filter<T>(event: Event<T>, filter: (e: T) => boolean, disposable?: DisposableStore): Event<T>;
 	export function filter<T, R>(event: Event<T | R>, filter: (e: T | R) => e is R, disposable?: DisposableStore): Event<R>;
 	export function filter<T>(event: Event<T>, filter: (e: T) => boolean, disposable?: DisposableStore): Event<T> {
-		return snapshot((listener, thisArgs = null, disposables?) => event(e => filter(e) && listener.call(thisArgs, e), null, disposables), disposable);
+		return snapshot(
+			(listener, thisArgs = null, disposables?) => {
+				// 增加一层filter过滤，
+				// 只有复合filter过滤条件的才调用listener(e)进行事件触发
+				return event(e => filter(e) && listener.call(thisArgs, e), null, disposables);
+			},
+			disposable,
+		);
 	}
 
 	/**
@@ -184,10 +193,14 @@ export namespace Event {
 	/**
 	 * Given a collection of events, returns a single event which emits
 	 * whenever any of the provided events emit.
+	 * 传入一组事件，只要有一个事件触发，都会触发“返回的新的事情”
 	 */
 	export function any<T>(...events: Event<T>[]): Event<T>;
 	export function any(...events: Event<any>[]): Event<void>;
 	export function any<T>(...events: Event<T>[]): Event<T> {
+		// any函数对传入的所有VSCode事件侦听器添加回调并返回一个新的事件侦听器，
+		// 添加的回调逻辑是触发新的事件侦听器的listener回调，
+		// 因此只要传入的这一组事件中有一个事件触发了，都会触发“返回的新事件侦听器”的事件
 		return (listener, thisArgs = null, disposables?) => combinedDisposable(...events.map(event => event(e => listener.call(thisArgs, e), null, disposables)));
 	}
 
