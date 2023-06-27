@@ -714,6 +714,7 @@ export class CodeApplication extends Disposable {
 		return this.mainInstantiationService.createChild(services);
 	}
 
+	// 初始主进程Electron IPC服务的信道服务
 	private initChannels(accessor: ServicesAccessor, mainProcessElectronServer: ElectronIPCServer, sharedProcessClient: Promise<MessagePortClient>): void {
 
 		// Channels registered to node.js are exposed to second instances

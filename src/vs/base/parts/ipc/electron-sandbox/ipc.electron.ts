@@ -13,13 +13,18 @@ import { ipcRenderer } from 'vs/base/parts/sandbox/electron-sandbox/globals';
 /**
  * An implementation of `IPCClient` on top of Electron `ipcRenderer` IPC communication
  * provided from sandbox globals (via preload script).
+ * 基于Electron ipcRenderer的IPCClient客户端实现，
+ * 用于和“基于Electron ipcMain”的IPCServer服务端进行ipc通信
  */
 export class Client extends IPCClient implements IDisposable {
 
 	private protocol: ElectronProtocol;
 
+	// 创建基于ipcRenderer实现的Protcol
 	private static createProtocol(): ElectronProtocol {
+		// 创建基于ipcRenderer实现的监听'vscode:message'事件的VSCode事件侦听器
 		const onMessage = Event.fromNodeEventEmitter<VSBuffer>(ipcRenderer, 'vscode:message', (_, message) => VSBuffer.wrap(message));
+		// 向IPCServer发送'vscode:hello'握手事件
 		ipcRenderer.send('vscode:hello');
 
 		return new ElectronProtocol(ipcRenderer, onMessage);

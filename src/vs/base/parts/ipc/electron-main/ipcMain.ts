@@ -9,6 +9,10 @@ import { Event } from 'vs/base/common/event';
 
 type ipcMainListener = (event: IpcMainEvent, ...args: any[]) => void;
 
+/**
+ * 以一种安全的方式使用ipcMain,
+ * 会验证sender是否合法，避免将消息发送到不受心热的渲染器
+ */
 class ValidatedIpcMain implements Event.NodeEventEmitter {
 
 	// We need to keep a map of original listener to the wrapped variant in order
@@ -19,6 +23,7 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 	/**
 	 * Listens to `channel`, when a new message arrives `listener` would be called with
 	 * `listener(event, args...)`.
+	 * 重写icpMain.on，要求验证sender是否合法
 	 */
 	on(channel: string, listener: ipcMainListener): this {
 
@@ -40,6 +45,7 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 	/**
 	 * Adds a one time `listener` function for the event. This `listener` is invoked
 	 * only the next time a message is sent to `channel`, after which it is removed.
+	 * 重写icpMain.once，要求验证sender是否合法
 	 */
 	once(channel: string, listener: ipcMainListener): this {
 		unsafeIpcMain.once(channel, (event: IpcMainEvent, ...args: any[]) => {
@@ -66,6 +72,8 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 	 * Errors thrown through `handle` in the main process are not transparent as they
 	 * are serialized and only the `message` property from the original error is
 	 * provided to the renderer process. Please refer to #24427 for details.
+	 *
+	 * 重写ipcMain.handle，要求验证sender是否合法
 	 */
 	handle(channel: string, listener: (event: IpcMainInvokeEvent, ...args: any[]) => Promise<unknown>): this {
 		unsafeIpcMain.handle(channel, (event: IpcMainInvokeEvent, ...args: any[]) => {
@@ -102,7 +110,9 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 		return this;
 	}
 
+	// 验证事件是否合法
 	private validateEvent(channel: string, event: IpcMainEvent | IpcMainInvokeEvent): boolean {
+		// 事件名称必须以vscode:开头
 		if (!channel || !channel.startsWith('vscode:')) {
 			onUnexpectedError(`Refused to handle ipcMain event for channel '${channel}' because the channel is unknown.`);
 			return false; // unexpected channel
@@ -111,6 +121,7 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 		const sender = event.senderFrame;
 
 		const url = sender.url;
+		// hack playwright
 		if (!url) {
 			return true; // TODO@electron this only seems to happen from playwright runs (https://github.com/microsoft/vscode/issues/147301)
 		}
@@ -123,11 +134,13 @@ class ValidatedIpcMain implements Event.NodeEventEmitter {
 			return false; // unexpected URL
 		}
 
+		// 验证渲染进程的host是否合法
 		if (host !== 'vscode-app') {
 			onUnexpectedError(`Refused to handle ipcMain event for channel '${channel}' because of a bad origin of '${host}'.`);
 			return false; // unexpected sender
 		}
 
+		// 只允许顶层frame发送通信
 		if (sender.parent !== null) {
 			onUnexpectedError(`Refused to handle ipcMain event for channel '${channel}' because sender of origin '${host}' is not a main frame.`);
 			return false; // unexpected frame

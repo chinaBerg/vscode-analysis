@@ -95,6 +95,10 @@ interface IHandler {
 	(response: IRawResponse): void;
 }
 
+/**
+ * 通信协议，
+ * 约定通过send发送消息，通过onMessage接收消息
+ */
 export interface IMessagePassingProtocol {
 	send(buffer: VSBuffer): void;
 	onMessage: Event<VSBuffer>;
@@ -177,6 +181,7 @@ class BufferReader implements IReader {
 	}
 }
 
+// 写入buffer
 class BufferWriter implements IWriter {
 
 	private buffers: VSBuffer[] = [];
@@ -209,6 +214,7 @@ function readSizeBuffer(reader: IReader): number {
 	return reader.read(4).readUInt32BE(0);
 }
 
+// 创建1字节的buffer
 function createOneByteBuffer(value: number): VSBuffer {
 	const result = VSBuffer.alloc(1);
 	result.writeUInt8(value, 0);
@@ -227,20 +233,28 @@ const BufferPresets = {
 declare const Buffer: any;
 const hasBuffer = (typeof Buffer !== 'undefined');
 
+// 序列化（通信消息）
+// 序列化后的数据，第一个字节用于标识数据的类型
 function serialize(writer: IWriter, data: any): void {
 	if (typeof data === 'undefined') {
 		writer.write(BufferPresets.Undefined);
 	} else if (typeof data === 'string') {
+		// 字符串类型，转换成VSBuffer数据
 		const buffer = VSBuffer.fromString(data);
+		// 第一个字节标识字符串
 		writer.write(BufferPresets.String);
+		// 紧接着四个字节
 		writer.write(createSizeBuffer(buffer.byteLength));
+		// 后续字节为buffer数据
 		writer.write(buffer);
 	} else if (hasBuffer && Buffer.isBuffer(data)) {
+		// buffer转换成VSBuffer
 		const buffer = VSBuffer.wrap(data);
 		writer.write(BufferPresets.Buffer);
 		writer.write(createSizeBuffer(buffer.byteLength));
 		writer.write(buffer);
 	} else if (data instanceof VSBuffer) {
+		// VSBuffer
 		writer.write(BufferPresets.VSBuffer);
 		writer.write(createSizeBuffer(data.byteLength));
 		writer.write(data);
@@ -286,6 +300,7 @@ interface PendingRequest {
 	timeoutTimer: any;
 }
 
+// 信道服务器
 export class ChannelServer<TContext = string> implements IChannelServer<TContext>, IDisposable {
 
 	private channels = new Map<string, IServerChannel<TContext>>();
@@ -301,6 +316,7 @@ export class ChannelServer<TContext = string> implements IChannelServer<TContext
 		this.sendResponse({ type: ResponseType.Initialize });
 	}
 
+	// 注册信道
 	registerChannel(channelName: string, channel: IServerChannel<TContext>): void {
 		this.channels.set(channelName, channel);
 
@@ -492,6 +508,7 @@ export interface IIPCLogger {
 	logOutgoing(msgLength: number, requestId: number, initiator: RequestInitiator, str: string, data?: any): void;
 }
 
+// 信道客户端
 export class ChannelClient implements IChannelClient, IDisposable {
 
 	private isDisposed: boolean = false;
@@ -506,10 +523,12 @@ export class ChannelClient implements IChannelClient, IDisposable {
 	readonly onDidInitialize = this._onDidInitialize.event;
 
 	constructor(private protocol: IMessagePassingProtocol, logger: IIPCLogger | null = null) {
+		// 注册通信消息协议的onMessage消息回调
 		this.protocolListener = this.protocol.onMessage(msg => this.onBuffer(msg));
 		this.logger = logger;
 	}
 
+	// 获取信道
 	getChannel<T extends IChannel>(channelName: string): T {
 		const that = this;
 
@@ -762,22 +781,28 @@ export class IPCServer<TContext = string> implements IChannelServer<TContext>, I
 	}
 
 	constructor(onDidClientConnect: Event<ClientConnectionEvent>) {
+		// 调用onDidClientConnect侦听客户端连接的事件，未来某个时刻事件触发后会执行回调
 		onDidClientConnect(({ protocol, onDidClientDisconnect }) => {
+			// 接收到第一条消息的事件
 			const onFirstMessage = Event.once(protocol.onMessage);
 
 			onFirstMessage(msg => {
 				const reader = new BufferReader(msg);
 				const ctx = deserialize(reader) as TContext;
 
+				// 创建频道服务器、频道客户端
 				const channelServer = new ChannelServer(protocol, ctx);
 				const channelClient = new ChannelClient(protocol);
 
 				this.channels.forEach((channel, name) => channelServer.registerChannel(name, channel));
 
+				// 创建连接并触发连接完成事件
 				const connection: Connection<TContext> = { channelServer, channelClient, ctx };
 				this._connections.add(connection);
 				this._onDidAddConnection.fire(connection);
 
+				// 客户端断开连接后的事件，
+				// 销毁频道服务器、频道客户端；移除连接；触发连接移除的事件
 				onDidClientDisconnect(() => {
 					channelServer.dispose();
 					channelClient.dispose();
@@ -889,6 +914,7 @@ export class IPCServer<TContext = string> implements IChannelServer<TContext>, I
 		return emitter.event;
 	}
 
+	// 注册信道
 	registerChannel(channelName: string, channel: IServerChannel<TContext>): void {
 		this.channels.set(channelName, channel);
 

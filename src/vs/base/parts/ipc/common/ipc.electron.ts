@@ -15,6 +15,9 @@ export interface Sender {
  * The Electron `Protocol` leverages Electron style IPC communication (`ipcRenderer`, `ipcMain`)
  * for the implementation of the `IMessagePassingProtocol`. That style of API requires a channel
  * name for sending data.
+ * Electron环境下的Protocol，
+ * 需要从外部传入sender和onMessage，
+ * 利用onMessage接收消息，send借助sender.send发送消息
  */
 export class Protocol implements IMessagePassingProtocol {
 
