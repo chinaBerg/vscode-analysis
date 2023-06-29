@@ -510,6 +510,7 @@ export class CodeApplication extends Disposable {
 		}
 
 		// Main process server (electron IPC based)
+		// 初始化主进程IPC服务，用于服务渲染进程的IPC请求
 		const mainProcessElectronServer = new ElectronIPCServer();
 		this.lifecycleMainService.onWillShutdown(e => {
 			if (e.reason === ShutdownReason.KILL) {
@@ -518,6 +519,7 @@ export class CodeApplication extends Disposable {
 				// the chance of doing work after we go down. Kill
 				// is special in that it does not orderly shutdown
 				// windows.
+				// 销毁IPC服务
 				mainProcessElectronServer.dispose();
 			}
 		});
@@ -537,6 +539,7 @@ export class CodeApplication extends Disposable {
 		this.setUpHandlers(appInstantiationService);
 
 		// Init Channels
+		// 注册信道服务，IPC服务请求最终调用具体的信道服务进行处理
 		appInstantiationService.invokeFunction(accessor => this.initChannels(accessor, mainProcessElectronServer, sharedProcessClient));
 
 		// Open Windows
@@ -714,7 +717,7 @@ export class CodeApplication extends Disposable {
 		return this.mainInstantiationService.createChild(services);
 	}
 
-	// 初始主进程Electron IPC服务的信道服务
+	// 初始化主进程IPC服务的信道服务
 	private initChannels(accessor: ServicesAccessor, mainProcessElectronServer: ElectronIPCServer, sharedProcessClient: Promise<MessagePortClient>): void {
 
 		// Channels registered to node.js are exposed to second instances

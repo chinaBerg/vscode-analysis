@@ -1107,7 +1107,8 @@ export namespace ProxyChannel {
 	export interface ICreateServiceChannelOptions extends IProxyOptions { }
 
 	/**
-	 * 将service包装成channel
+	 * 将service包装成信道服务，
+	 * - 信道服务接口要求包含一个call方法和一个listen方法用于调用功能并返回结果
 	 */
 	export function fromService<TContext>(service: unknown, options?: ICreateServiceChannelOptions): IServerChannel<TContext> {
 		const handler = service as { [key: string]: unknown };
@@ -1117,6 +1118,7 @@ export namespace ProxyChannel {
 		// iterating over all property keys and finding them
 		const mapEventNameToEvent = new Map<string, Event<unknown>>();
 		for (const key in handler) {
+			// 处理事件，即on后跟大写字母开头的属性
 			if (propertyIsEvent(key)) {
 				mapEventNameToEvent.set(key, Event.buffer(handler[key] as Event<unknown>, true));
 			}
@@ -1142,15 +1144,18 @@ export namespace ProxyChannel {
 
 			call(_: unknown, command: string, args?: any[]): Promise<any> {
 				const target = handler[command];
+				// 只允许信道客户端请求信道服务器中信道服务的某个方法，否则抛错
 				if (typeof target === 'function') {
 
 					// Revive unless marshalling disabled
+					// 处理参数，对编组过的数据进行复原
 					if (!disableMarshalling && Array.isArray(args)) {
 						for (let i = 0; i < args.length; i++) {
 							args[i] = revive(args[i]);
 						}
 					}
 
+					// 返回调用结果
 					return target.apply(handler, args);
 				}
 
