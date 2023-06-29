@@ -165,6 +165,7 @@ export function isCancellationError(error: any): boolean {
 
 // !!!IMPORTANT!!!
 // Do NOT change this class because it is also used as an API-type.
+// “已被取消”错误
 export class CancellationError extends Error {
 	constructor() {
 		super(canceledName);
