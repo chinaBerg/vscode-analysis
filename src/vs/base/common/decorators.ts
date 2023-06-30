@@ -24,14 +24,19 @@ function createDecorator(mapFn: (fn: Function, key: string) => Function): Functi
 	};
 }
 
+/**
+ * 记忆函数的装饰器实现
+ */
 export function memoize(_target: any, key: string, descriptor: any) {
 	let fnKey: string | null = null;
 	let fn: Function | null = null;
 
+	// 获取装饰目标
 	if (typeof descriptor.value === 'function') {
 		fnKey = 'value';
 		fn = descriptor.value;
 
+		// 只允许装饰的函数没有任何形参
 		if (fn!.length !== 0) {
 			console.warn('Memoize should only be used in functions with zero parameters');
 		}
@@ -40,17 +45,20 @@ export function memoize(_target: any, key: string, descriptor: any) {
 		fn = descriptor.get;
 	}
 
+	// 只允许装饰方法
 	if (!fn) {
 		throw new Error('not supported');
 	}
 
 	const memoizeKey = `$memoize$${key}`;
 	descriptor[fnKey!] = function (...args: any[]) {
+		// 缓存结果
 		if (!this.hasOwnProperty(memoizeKey)) {
 			Object.defineProperty(this, memoizeKey, {
 				configurable: false,
 				enumerable: false,
 				writable: false,
+				// 调用取值
 				value: fn!.apply(this, args)
 			});
 		}
