@@ -523,6 +523,7 @@ export namespace Event {
 		return result.event;
 	}
 
+	// 将事件包裹成Promise，在事件触发后会resolve
 	export function toPromise<T>(event: Event<T>): Promise<T> {
 		return new Promise(resolve => once(event)(resolve));
 	}

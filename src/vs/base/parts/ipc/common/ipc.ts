@@ -399,10 +399,13 @@ export class ChannelServer<TContext = string> implements IChannelServer<TContext
 			return;
 		}
 
+		// 生成一个取消令牌
 		const cancellationTokenSource = new CancellationTokenSource();
 		let promise: Promise<any>;
 
 		try {
+			// 调用信道服务的call方法时最后一个参数传递取消令牌，
+			// 让信道服务有机会主动终止服务请求
 			promise = channel.call(this.ctx, request.name, request.arg, cancellationTokenSource.token);
 		} catch (err) {
 			promise = Promise.reject(err);
@@ -411,9 +414,11 @@ export class ChannelServer<TContext = string> implements IChannelServer<TContext
 		const id = request.id;
 
 		promise.then(data => {
+			// 信道服务的功能调用成功后，响应信道客户端数据
 			this.sendResponse(<IRawResponse>{ id, data, type: ResponseType.PromiseSuccess });
 			this.activeRequests.delete(request.id);
 		}, err => {
+			// 信道服务的功能调用失败，响应信道客户端失败结果
 			if (err instanceof Error) {
 				this.sendResponse(<IRawResponse>{
 					id, data: {
@@ -573,6 +578,7 @@ export class ChannelClient implements IChannelClient, IDisposable {
 		const type = RequestType.Promise;
 		const request: IRawRequest = { id, type, channelName, name, arg };
 
+		// 请求已被取消
 		if (cancellationToken.isCancellationRequested) {
 			return Promise.reject(new CancellationError());
 		}
@@ -744,22 +750,28 @@ export class ChannelClient implements IChannelClient, IDisposable {
 	}
 
 	private onResponse(response: IRawResponse): void {
+		// 处理信道服务器响应“信道客户端连接请求”的消息，
+		// 信道客户端初始化后会立即向信道服务器发送第一条消息，用于申请连接，信道服务器收到后会发送一条响应数据。
+		// 连接成功后，将信道客户端的状态设置为可用状态（State.Idle）
 		if (response.type === ResponseType.Initialize) {
 			this.state = State.Idle;
+			// 触发信道客户端初始化成功事件
 			this._onDidInitialize.fire();
 			return;
 		}
 
+		// 收到信道服务器响应后，执行请求的回调
 		const handler = this.handlers.get(response.id);
-
 		handler?.(response);
 	}
 
 	@memoize
 	get onDidInitializePromise(): Promise<void> {
+		// 返回一个promise，this._onDidInitialize.fire触发后会resolve
 		return Event.toPromise(this.onDidInitialize);
 	}
 
+	// 等待客户端初始化完成
 	private whenInitialized(): Promise<void> {
 		if (this.state === State.Idle) {
 			return Promise.resolve();
