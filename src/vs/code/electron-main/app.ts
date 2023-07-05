@@ -579,18 +579,25 @@ export class CodeApplication extends Disposable {
 	}
 
 	private setupSharedProcess(machineId: string): { sharedProcess: SharedProcess; sharedProcessReady: Promise<MessagePortClient>; sharedProcessClient: Promise<MessagePortClient> } {
+		// 实例化一个sharedProcess
 		const sharedProcess = this._register(this.mainInstantiationService.createInstance(SharedProcess, machineId, this.userEnv));
 
+		// 基于MessagePort的信道客户端promise，
+		// 需要在sharedProcessClient.then(client => {})使用client
 		const sharedProcessClient = (async () => {
 			this.logService.trace('Main->SharedProcess#connect');
 
+			// 获取MessagePort端口
 			const port = await sharedProcess.connect();
 
 			this.logService.trace('Main->SharedProcess#connect: connection established');
 
+			// 创建MessagePort的信道客户端
+			// 该模式下利用MessagePort进行通信，即MessageChannel.port1 和 port2
 			return new MessagePortClient(port, 'main');
 		})();
 
+		// 等下sharedProcess准备完毕的promise
 		const sharedProcessReady = (async () => {
 			await sharedProcess.whenReady();
 
@@ -734,6 +741,7 @@ export class CodeApplication extends Disposable {
 		// Policies (main & shared process)
 		const policyChannel = new PolicyChannel(accessor.get(IPolicyService));
 		mainProcessElectronServer.registerChannel('policy', policyChannel);
+		// sharedProcess信道客户端准备完毕后即可注册信道服务了
 		sharedProcessClient.then(client => client.registerChannel('policy', policyChannel));
 
 		// Local Files

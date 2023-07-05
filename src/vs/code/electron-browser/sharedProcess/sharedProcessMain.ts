@@ -494,6 +494,8 @@ export async function main(configuration: ISharedProcessConfiguration): Promise<
 	ipcRenderer.send('vscode:shared-process->electron-main=ipc-ready');
 
 	// await initialization and signal this back to electron-main
+	// 等待共享进程的主服务真正初始化完成，包括服务注册、信道服务注册等等，
+	// 初始化完成后通知主进程
 	await sharedProcess.open();
 	ipcRenderer.send('vscode:shared-process->electron-main=init-done');
 }

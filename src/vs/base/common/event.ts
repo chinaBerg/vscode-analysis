@@ -514,8 +514,17 @@ export namespace Event {
 		removeEventListener(event: string | symbol, listener: Function): void;
 	}
 
+	/**
+	 * 根据DOM的事件转换成VSCode事件触发器，
+	 * 本质对DOM的事件监听进行了一层包裹，变成了VSCode Event触发器的事件监听，
+	 * @param emitter
+	 * @param eventName
+	 * @param map
+	 * @returns
+	 */
 	export function fromDOMEventEmitter<T>(emitter: DOMEventEmitter, eventName: string, map: (...args: any[]) => T = id => id): Event<T> {
 		const fn = (...args: any[]) => result.fire(map(...args));
+		// 调用dom.addEventListener进行事件监听
 		const onFirstListenerAdd = () => emitter.addEventListener(eventName, fn);
 		const onLastListenerRemove = () => emitter.removeEventListener(eventName, fn);
 		const result = new Emitter<T>({ onWillAddFirstListener: onFirstListenerAdd, onDidRemoveLastListener: onLastListenerRemove });

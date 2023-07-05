@@ -23,6 +23,10 @@ export interface MessageEvent {
 	data: Uint8Array;
 }
 
+/**
+ * 定义MessagePort接口，
+ * 和web端的MessagePort的mdn定义一样
+ */
 export interface MessagePort {
 
 	addEventListener(type: 'message', listener: (this: MessagePort, e: MessageEvent) => unknown): void;
@@ -38,9 +42,12 @@ export interface MessagePort {
  * The MessagePort `Protocol` leverages MessagePort style IPC communication
  * for the implementation of the `IMessagePassingProtocol`. That style of API
  * is a simple `onmessage` / `postMessage` pattern.
+ * 基于MessagePort实现的进程间通信协议，本质是一种onmessage/postMessage的通信
  */
 export class Protocol implements IMessagePassingProtocol {
 
+	// 创建基于DOM事件实现的监听addEventListener('message')事件的VSCode事件侦听器,
+	// 且将message收到的数据转换成VSBuffer
 	readonly onMessage = Event.fromDOMEventEmitter<VSBuffer>(this.port, 'message', (e: MessageEvent) => VSBuffer.wrap(e.data));
 
 	constructor(private port: MessagePort) {
@@ -49,10 +56,12 @@ export class Protocol implements IMessagePassingProtocol {
 		port.start();
 	}
 
+	// 发送消息的实现，借助port.postMessage实现
 	send(message: VSBuffer): void {
 		this.port.postMessage(message.buffer);
 	}
 
+	// 断开连接
 	disconnect(): void {
 		this.port.close();
 	}

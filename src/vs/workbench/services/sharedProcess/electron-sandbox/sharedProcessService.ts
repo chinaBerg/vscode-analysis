@@ -26,9 +26,11 @@ export class SharedProcessService extends Disposable implements ISharedProcessSe
 	) {
 		super();
 
+		// 连接共享进程
 		this.withSharedProcessConnection = this.connect();
 	}
 
+	// 连接共享进程
 	private async connect(): Promise<MessagePortClient> {
 		this.logService.trace('Renderer->SharedProcess#connect');
 
@@ -47,6 +49,7 @@ export class SharedProcessService extends Disposable implements ISharedProcessSe
 		mark('code/didConnectSharedProcess');
 		this.logService.trace('Renderer->SharedProcess#connect: connection established');
 
+		// 返回信道客户端实例，用于后续通信
 		return this._register(new MessagePortClient(port, `window:${this.windowId}`));
 	}
 

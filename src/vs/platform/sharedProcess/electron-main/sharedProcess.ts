@@ -27,6 +27,7 @@ import { IPolicyService } from 'vs/platform/policy/common/policy';
 
 export class SharedProcess extends Disposable implements ISharedProcess {
 
+	// 初始化一个第一个窗口的屏障
 	private readonly firstWindowConnectionBarrier = new Barrier();
 
 	private window: BrowserWindow | undefined = undefined;
@@ -188,15 +189,18 @@ export class SharedProcess extends Disposable implements ISharedProcess {
 		return this._whenReady;
 	}
 
+	// 等待IPC准备完毕
 	private _whenIpcReady: Promise<void> | undefined = undefined;
 	private get whenIpcReady() {
 		if (!this._whenIpcReady) {
 			this._whenIpcReady = (async () => {
 
 				// Always wait for first window asking for connection
+				// 等待第一个窗口的连接请求
 				await this.firstWindowConnectionBarrier.wait();
 
 				// Create window for shared process
+				// 创建窗口
 				this.createWindow();
 
 				// Listeners
@@ -214,6 +218,7 @@ export class SharedProcess extends Disposable implements ISharedProcess {
 		return this._whenIpcReady;
 	}
 
+	// 创建窗口
 	private createWindow(): void {
 		const configObjectUrl = this._register(this.protocolMainService.createIPCObjectUrl<ISharedProcessConfiguration>());
 
@@ -281,13 +286,16 @@ export class SharedProcess extends Disposable implements ISharedProcess {
 		this.window.webContents.on('did-fail-load', (event, exitCode, reason) => this._onDidError.fire({ type: WindowError.LOAD, details: { reason, exitCode } }));
 	}
 
+	// 连接
 	async connect(): Promise<MessagePortMain> {
 
 		// Wait for shared process being ready to accept connection
+		// 等待共享进程准备接受连接
 		await this.whenIpcReady;
 
 		// Connect and return message port
 		const window = assertIsDefined(this.window);
+		// 获取MessagePort
 		return connectMessagePort(window);
 	}
 
