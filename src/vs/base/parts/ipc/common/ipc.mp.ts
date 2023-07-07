@@ -69,6 +69,9 @@ export class Protocol implements IMessagePassingProtocol {
 
 /**
  * An implementation of a `IPCClient` on top of MessagePort style IPC communication.
+ * 基于MessagePort风格实现的信道客户端，
+ * 用于ELectron主进程、渲染进程等的MessagePort风格信道客户端都会基于此类进行扩展或重写，
+ * 比如主进程的MessageChannel的api不一样，因此其需要做一层API转换
  */
 export class Client extends IPCClient implements IDisposable {
 

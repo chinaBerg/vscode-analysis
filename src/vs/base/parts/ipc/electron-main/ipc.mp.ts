@@ -12,7 +12,7 @@ import { Client as MessagePortClient } from 'vs/base/parts/ipc/common/ipc.mp';
 
 /**
  * An implementation of a `IPCClient` on top of Electron `MessagePortMain`.
- * 用于Electron主进程的基于MessagePort的信道客户端，
+ * 用于Electron主进程的基于MessagePortMain的信道客户端，
  * 继承自vs/base/parts/ipc/common/ipc.mp基础的MessagePort信道客户端，对port进行了一层api转换，
  * 转换原因是Electorn主进程中实现的MessagePortMain是基于NodeJs EventEmitter的，事件监听的api不一致，
  * MessagePortMain与DOM版本的MessagePort功能等价，api不等价，所以做了一层转换
@@ -39,7 +39,8 @@ export class Client extends MessagePortClient implements IDisposable {
  * This method opens a message channel connection
  * in the target window. The target window needs
  * to use the `Server` from `electron-sandbox/ipc.mp`.
- * 在目标窗口里打开一个MessageChannel连接
+ * 向目标渲染进程（实际是sharedProcess）发送vscode:createMessageChannel指令，
+ * sharedProcess收到消息后创建MessageChannel，然后响应vscode:createMessageChannelResult事件，返回MessagePort端口
  */
 export async function connect(window: BrowserWindow): Promise<MessagePortMain> {
 

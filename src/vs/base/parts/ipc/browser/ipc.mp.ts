@@ -8,6 +8,8 @@ import { Client as MessagePortClient } from 'vs/base/parts/ipc/common/ipc.mp';
 
 /**
  * An implementation of a `IPCClient` on top of DOM `MessagePort`.
+ * 基于DOM MessagePort实现的信道客户端，
+ * 用于纯web环境
  */
 export class Client extends MessagePortClient implements IDisposable {
 
