@@ -305,9 +305,12 @@ class CodeMain {
 		// Try to setup a server for running. If that succeeds it means
 		// we are the first instance to startup. Otherwise it is likely
 		// that another instance is already running.
+		// 尝试启动一个服务器，如果启动成功则意味为启动的第一个示例，
+		// 否则，可能已经存在另一个实例的服务已经在运行了
 		let mainProcessNodeIpcServer: NodeIPCServer;
 		try {
 			mark('code/willStartMainServer');
+			// 启动NodeIPCServer
 			mainProcessNodeIpcServer = await nodeIPCServe(environmentMainService.mainIPCHandle);
 			mark('code/didStartMainServer');
 			once(lifecycleMainService.onWillShutdown)(() => mainProcessNodeIpcServer.dispose());
@@ -315,6 +318,7 @@ class CodeMain {
 
 			// Handle unexpected errors (the only expected error is EADDRINUSE that
 			// indicates another instance of VS Code is running)
+			// 唯一的一个预期错误，另一个VSCODE已经运行了
 			if (error.code !== 'EADDRINUSE') {
 
 				// Show a dialog for errors that can be resolved by the user
@@ -327,6 +331,7 @@ class CodeMain {
 			// there's a running instance, let's connect to it
 			let client: NodeIPCClient<string>;
 			try {
+				// 尝试创建一个NodeIPCClient连接到NodeIPCServer
 				client = await nodeIPCConnect(environmentMainService.mainIPCHandle, 'main');
 			} catch (error) {
 

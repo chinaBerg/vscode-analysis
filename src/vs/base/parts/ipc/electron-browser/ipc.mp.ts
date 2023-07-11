@@ -11,6 +11,8 @@ import { Protocol as MessagePortProtocol } from 'vs/base/parts/ipc/common/ipc.mp
 /**
  * An implementation of a `IPCServer` on top of MessagePort style IPC communication.
  * The clients register themselves via Electron IPC transfer.
+ * 创建基于MessagePort风格的IPCServer，
+ * 用于共享进程
  */
 export class Server extends IPCServer {
 

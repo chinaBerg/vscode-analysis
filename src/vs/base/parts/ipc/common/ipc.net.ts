@@ -161,6 +161,7 @@ function getEmptyBuffer(): VSBuffer {
 	return emptyBuffer;
 }
 
+// 对数据流进行分块
 export class ChunkStream {
 
 	private _chunks: VSBuffer[];
@@ -175,12 +176,15 @@ export class ChunkStream {
 		this._totalLength = 0;
 	}
 
+	// 缓存传入的buffer，并更新buffer总长度
 	public acceptChunk(buff: VSBuffer) {
 		this._chunks.push(buff);
 		this._totalLength += buff.byteLength;
 	}
 
+	// 从chunk中读取buffer
 	public read(byteCount: number): VSBuffer {
+		// true参数表示处理完毕后即仍
 		return this._read(byteCount, true);
 	}
 
@@ -190,6 +194,7 @@ export class ChunkStream {
 
 	private _read(byteCount: number, advance: boolean): VSBuffer {
 
+		// 返回空buffer
 		if (byteCount === 0) {
 			return getEmptyBuffer();
 		}
@@ -198,6 +203,8 @@ export class ChunkStream {
 			throw new Error(`Cannot read so many bytes!`);
 		}
 
+		// 匹配到指定长度直接返回
+		// 例如 [header body, header body, header body] 匹配到13个字节长度的header后直接返回header
 		if (this._chunks[0].byteLength === byteCount) {
 			// super fast path, precisely first chunk must be returned
 			const result = this._chunks[0];
@@ -208,6 +215,8 @@ export class ChunkStream {
 			return result;
 		}
 
+		// 匹配的buffer长度大于预期长度时，进行截取，
+		// 例如 [header body header body, header body] chunks[0]取完header后剩余 body header body，再取完body时对chunks[0]进行截取变成header body
 		if (this._chunks[0].byteLength > byteCount) {
 			// fast path, the reading is entirely within the first chunk
 			const result = this._chunks[0].slice(0, byteCount);
@@ -254,6 +263,7 @@ export class ChunkStream {
 	}
 }
 
+// 协议的消息类型
 const enum ProtocolMessageType {
 	None = 0,
 	Regular = 1,
@@ -265,7 +275,7 @@ const enum ProtocolMessageType {
 	Resume = 8,
 	KeepAlive = 9,
 }
-
+// 消息类型转换成字符串标识
 function protocolMessageTypeToString(messageType: ProtocolMessageType) {
 	switch (messageType) {
 		case ProtocolMessageType.None: return 'None';
@@ -302,6 +312,7 @@ export const enum ProtocolConstants {
 	ReconnectionShortGraceTime = 5 * 60 * 1000, // 5min
 }
 
+// 协议消息
 class ProtocolMessage {
 
 	public writtenTime: number;
@@ -320,6 +331,10 @@ class ProtocolMessage {
 	}
 }
 
+/**
+ * 协议读取器,
+ * 用于侦听消息，并将接收到的VSBuffer数据拆包成业务使用的ProtocolMessage格式
+ */
 class ProtocolReader extends Disposable {
 
 	private readonly _socket: ISocket;
@@ -327,6 +342,7 @@ class ProtocolReader extends Disposable {
 	private readonly _incomingData: ChunkStream;
 	public lastReadTime: number;
 
+	// onMessage用于侦听收到消息事件
 	private readonly _onMessage = this._register(new Emitter<ProtocolMessage>());
 	public readonly onMessage: Event<ProtocolMessage> = this._onMessage.event;
 
@@ -342,11 +358,14 @@ class ProtocolReader extends Disposable {
 		super();
 		this._socket = socket;
 		this._isDisposed = false;
+		// 存储并处理接收到的VSBuffer数据
 		this._incomingData = new ChunkStream();
+		// 接收到消息后，调用acceptChunk方法对VSBuffer数据拆包还原成ProtocolMessage对象格式
 		this._register(this._socket.onData(data => this.acceptChunk(data)));
 		this.lastReadTime = Date.now();
 	}
 
+	// 处理接收到的数据
 	public acceptChunk(data: VSBuffer | null): void {
 		if (!data || data.byteLength === 0) {
 			return;
@@ -354,17 +373,21 @@ class ProtocolReader extends Disposable {
 
 		this.lastReadTime = Date.now();
 
+		// 数据存入_incomingData中，交由_incomingData进行拆包
 		this._incomingData.acceptChunk(data);
 
 		while (this._incomingData.byteLength >= this._state.readLen) {
 
 			const buff = this._incomingData.read(this._state.readLen);
 
+			// 拆出header
 			if (this._state.readHead) {
 				// buff is the header
 
 				// save new state => next time will read the body
+				// 设置readHead状态为false，标识header读取完毕，while下一轮开始读body了
 				this._state.readHead = false;
+				// 记录该读取的body字节长度
 				this._state.readLen = buff.readUInt32BE(9);
 				this._state.messageType = buff.readUInt8(0);
 				this._state.id = buff.readUInt32BE(1);
@@ -373,6 +396,7 @@ class ProtocolReader extends Disposable {
 				this._socket.traceSocketEvent(SocketDiagnosticsEventType.ProtocolHeaderRead, { messageType: protocolMessageTypeToString(this._state.messageType), id: this._state.id, ack: this._state.ack, messageSize: this._state.readLen });
 
 			} else {
+				// 拆出body
 				// buff is the body
 				const messageType = this._state.messageType;
 				const id = this._state.id;
@@ -387,6 +411,7 @@ class ProtocolReader extends Disposable {
 
 				this._socket.traceSocketEvent(SocketDiagnosticsEventType.ProtocolMessageRead, buff);
 
+				// 触发事件，标识拆包完成
 				this._onMessage.fire(new ProtocolMessage(messageType, id, ack, buff));
 
 				if (this._isDisposed) {
@@ -407,6 +432,10 @@ class ProtocolReader extends Disposable {
 	}
 }
 
+/**
+ * 协议写入器，
+ * 用于将消息序列化成buffer并发送
+ */
 class ProtocolWriter {
 
 	private _isDisposed: boolean;
@@ -461,7 +490,9 @@ class ProtocolWriter {
 		}
 		msg.writtenTime = Date.now();
 		this.lastWriteTime = Date.now();
+		// 申请13个字节长度的内存用于请求header
 		const header = VSBuffer.alloc(ProtocolConstants.HeaderLength);
+		// 第一个字节写入请求类型、后四字节请求id，再后字节ack，最后四字节data长度
 		header.writeUInt8(msg.type, 0);
 		header.writeUInt32BE(msg.id, 1);
 		header.writeUInt32BE(msg.ack, 5);
@@ -533,6 +564,9 @@ class ProtocolWriter {
  *  - DATA_LENGTH is 4 bytes (u32be) - the length in bytes of DATA
  *
  * Only Regular messages are counted, other messages are not counted, nor acknowledged.
+ *
+ * IPCNodeServer版本的协议实现，
+ * 接收net模块创建的socket作为实际发送消息的sender，
  */
 export class Protocol extends Disposable implements IMessagePassingProtocol {
 
@@ -540,6 +574,7 @@ export class Protocol extends Disposable implements IMessagePassingProtocol {
 	private _socketWriter: ProtocolWriter;
 	private _socketReader: ProtocolReader;
 
+	// 协议的onMessage实现基于VSCode事件侦听器
 	private readonly _onMessage = new Emitter<VSBuffer>();
 	readonly onMessage: Event<VSBuffer> = this._onMessage.event;
 
@@ -549,9 +584,11 @@ export class Protocol extends Disposable implements IMessagePassingProtocol {
 	constructor(socket: ISocket) {
 		super();
 		this._socket = socket;
+		// 初始化socket的writer和reader
 		this._socketWriter = this._register(new ProtocolWriter(this._socket));
 		this._socketReader = this._register(new ProtocolReader(this._socket));
 
+		// 侦听收到的消息，并触发ProtocolMessageType.Regular类型的消息事件
 		this._register(this._socketReader.onMessage((msg) => {
 			if (msg.type === ProtocolMessageType.Regular) {
 				this._onMessage.fire(msg.data);
@@ -573,13 +610,16 @@ export class Protocol extends Disposable implements IMessagePassingProtocol {
 		// Nothing to do...
 	}
 
+	// send方法利用writer.write实现
 	send(buffer: VSBuffer): void {
 		this._socketWriter.write(new ProtocolMessage(ProtocolMessageType.Regular, 0, 0, buffer));
 	}
 }
 
+// Socket风格的IPCClient实现
 export class Client<TContext = string> extends IPCClient<TContext> {
 
+	// 根据一个socket创建Client
 	static fromSocket<TContext = string>(socket: ISocket, id: TContext): Client<TContext> {
 		return new Client(new Protocol(socket), id);
 	}

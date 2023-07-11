@@ -27,6 +27,11 @@ function getNodeDependencies() {
 	};
 }
 
+/**
+ * 用于Node中的Socket，
+ * 主要基于Node net socket进行一层API封装适配ISocket接口，
+ * 对应方法接入IDisposable体系
+ */
 export class NodeSocket implements ISocket {
 
 	public readonly debugLabel: string;
@@ -748,6 +753,7 @@ export function createRandomIPCHandle(): string {
 	return result;
 }
 
+// 创建IPC句柄，windows下基于命名管道，unix下基于域套接字
 export function createStaticIPCHandle(directoryPath: string, type: string, version: string): string {
 	const scope = getNodeDependencies().crypto.createHash('md5').update(directoryPath).digest('hex');
 
@@ -767,6 +773,7 @@ export function createStaticIPCHandle(directoryPath: string, type: string, versi
 	}
 
 	// Validate length
+	// 校验句柄长度是否安全
 	validateIPCHandleLength(result);
 
 	return result;
@@ -780,12 +787,20 @@ function validateIPCHandleLength(handle: string): void {
 	}
 }
 
+/**
+ * Socket消息通信服务，
+ * Socket风格实现的IPCServer，
+ */
 export class Server extends IPCServer {
 
 	private static toClientConnectionEvent(server: NetServer): Event<ClientConnectionEvent> {
+		// 创建一个VSCode事件侦听器onConnection，用于监听server的connection事件
 		const onConnection = Event.fromNodeEventEmitter<Socket>(server, 'connection');
 
+		// onConnection触发后，执行回调函数，
+		// 回调函数执行结果作为传递给触发IPCServer构造函数参数函数的参数
 		return Event.map(onConnection, socket => ({
+			// 创建RPC的协议，new NodeSocket作为协议的sender
 			protocol: new Protocol(new NodeSocket(socket, 'ipc-server-connection')),
 			onDidClientDisconnect: Event.once(Event.fromNodeEventEmitter<void>(socket, 'close'))
 		}));
@@ -807,20 +822,24 @@ export class Server extends IPCServer {
 	}
 }
 
+// 根据端口号或者命名管道创建Socket消息服务器
 export function serve(port: number): Promise<Server>;
 export function serve(namedPipe: string): Promise<Server>;
 export function serve(hook: any): Promise<Server> {
 	return new Promise<Server>((c, e) => {
+		// node net模块创建tcp服务器或ipc服务器
 		const server = getNodeDependencies().net.createServer();
 
 		server.on('error', e);
 		server.listen(hook, () => {
 			server.removeListener('error', e);
+			// 实例化Socket消息通信服务器
 			c(new Server(server));
 		});
 	});
 }
 
+// 根据host+port后者命名管道窗口Socket消息客户端连接
 export function connect(options: { host: string; port: number }, clientId: string): Promise<Client>;
 export function connect(port: number, clientId: string): Promise<Client>;
 export function connect(namedPipe: string, clientId: string): Promise<Client>;
@@ -828,6 +847,7 @@ export function connect(hook: any, clientId: string): Promise<Client> {
 	return new Promise<Client>((c, e) => {
 		const socket = getNodeDependencies().net.createConnection(hook, () => {
 			socket.removeListener('error', e);
+			// 创建Socket消息客户端
 			c(Client.fromSocket(new NodeSocket(socket, `ipc-client${clientId}`), clientId));
 		});
 
