@@ -28,8 +28,10 @@ const _enableSnapshotPotentialLeakWarning = false;
 
 /**
  * An event with zero or one parameters that can be subscribed to. The event is a function itself.
- * 只有一个或零个参数的可订阅事件
- * 事件本身是一个函数
+ * VSCode中事件接口约定的是一个函数，
+ * 该函数的第一个参数是为该事件添加的侦听器函数，即每次调用会为该事件添加一个侦听器，
+ * 当事件触发后，所有被添加的侦听器函数都会依次调用执行。
+ * 事件被接入了IDisposable架构，可以通过dispose移除添加的侦听器
  */
 export interface Event<T> {
 	(listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[] | DisposableStore): IDisposable;
